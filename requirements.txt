@@ -1,0 +1,6 @@
+
+streamlit
+pytesseract
+pdf2image
+opencv-python-headless
+python-docx
