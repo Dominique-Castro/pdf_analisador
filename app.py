@@ -90,4 +90,4 @@ if __name__ == "__main__":
 
 # Adicionando a linha para iniciar o Streamlit
 if __name__ == "__main__":
-    st.run
+    st.
