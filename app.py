@@ -87,3 +87,7 @@ if __name__ == "__main__":
             st.markdown("- Todos os requisitos foram encontrados.")
     else:
         st.info("⬆️ Faça upload de um arquivo PDF para iniciar a análise.")
+
+# Adicionando a linha para iniciar o Streamlit
+if __name__ == "__main__":
+    st.run()
