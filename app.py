@@ -89,5 +89,5 @@ if __name__ == "__main__":
         st.info("⬆️ Faça upload de um arquivo PDF para iniciar a análise.")
 
 # Adicionando a linha para iniciar o Streamlit
-if __name__ == "__main__":
+__name__ == "__main__":
     
