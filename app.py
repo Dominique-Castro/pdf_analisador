@@ -1,11 +1,12 @@
+import os
 import streamlit as st
 import pytesseract
 from pdf2image import convert_from_bytes
-import io
-import os
 
-# Corrigindo a linha para permitir o servidor escutar em uma porta e ser acessível publicamente
-if __name__ == "__main__":  # Corrigido aqui
+# Definindo a porta
+port = os.getenv("PORT", "8501")  # 8501 é a porta padrão do Streamlit
+
+if __name__ == "__main__":
     st.set_page_config(page_title="Analisador de Requisitos em PDF", layout="centered")
 
     st.markdown("""
