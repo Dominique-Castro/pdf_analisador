@@ -4,8 +4,8 @@ from pdf2image import convert_from_bytes
 import io
 import os
 
-# Adicionando a linha para permitir o servidor escutar em uma porta e ser acessível publicamente
-if __name__ == "__main__":
+# Corrigindo a linha para permitir o servidor escutar em uma porta e ser acessível publicamente
+if __name__ == "__main__":  # Corrigido aqui
     st.set_page_config(page_title="Analisador de Requisitos em PDF", layout="centered")
 
     st.markdown("""
@@ -87,7 +87,3 @@ if __name__ == "__main__":
             st.markdown("- Todos os requisitos foram encontrados.")
     else:
         st.info("⬆️ Faça upload de um arquivo PDF para iniciar a análise.")
-
-# Adicionando a linha para iniciar o Streamlit
-__name__ == "__main__":
-    
