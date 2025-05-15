@@ -1,90 +1,100 @@
-import os
+
 import streamlit as st
-import pytesseract
 from pdf2image import convert_from_bytes
+import pytesseract
+from docx import Document
+import io
 
-# Definindo a porta
-port = os.getenv("PORT", "8501")  # 8501 é a porta padrão do Streamlit
+REQUISITOS = [
+    "Portaria da Sindicância Especial", "Parte de acidente",
+    "Atestado de Origem", "Primeiro Boletim de atendimento médico",
+    "Escala de serviço", "Ata de Habilitação para conduzir viatura",
+    "Documentação operacional", "Inquérito Técnico", "CNH",
+    "Formulário previsto na Portaria 095/SSP/15", "Oitiva do acidentado",
+    "Oitiva das testemunhas", "Parecer do Encarregado",
+    "Conclusão da Autoridade nomeante", "RHE", "LTS"
+]
 
-if __name__ == "__main__":
-    st.set_page_config(page_title="Analisador de Requisitos em PDF", layout="centered")
+def processar_pdf(uploaded_file):
+    imagens = convert_from_bytes(uploaded_file.read())
+    encontrados = {}
+    texto_por_pagina = []
 
-    st.markdown("""
-        <style>
-        .main {
-            background-color: #f5f5f5;
-        }
-        .stApp {
-            font-family: 'Segoe UI', sans-serif;
-            color: #2c3e50;
-        }
-        h1, h2, h3 {
-            color: #2c3e50;
-        }
-        .reportview-container .markdown-text-container {
-            padding: 2rem;
-            border-radius: 10px;
-            background-color: #ffffff;
-            box-shadow: 0px 4px 8px rgba(0,0,0,0.05);
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    for i, imagem in enumerate(imagens):
+        texto = pytesseract.image_to_string(imagem, lang='por')
+        texto_por_pagina.append(texto)
+        for requisito in REQUISITOS:
+            if requisito.lower() in texto.lower():
+                if requisito not in encontrados:
+                    encontrados[requisito] = []
+                encontrados[requisito].append(i + 1)
 
-    requisitos = [
-        "Portaria da Sindicância Especial",
-        "Parte de acidente",
-        "Atestado de Origem",
-        "Primeiro Boletim de atendimento médico",
-        "Escala de serviço",
-        "Ata de Habilitação para conduzir viatura",
-        "Documentação operacional",
-        "Inquérito Técnico",
-        "CNH",
-        "Formulário previsto na Portaria 095/SSP/15",
-        "Oitiva do acidentado",
-        "Oitiva das testemunhas",
-        "Parecer do Encarregado",
-        "Conclusão da Autoridade nomeante",
-        "RHE",
-        "LTS"
-    ]
+    nao_encontrados = [r for r in REQUISITOS if r not in encontrados]
+    return encontrados, nao_encontrados
 
-    st.title("📄 Analisador de Requisitos em PDF")
-    st.markdown("Faça o upload de um arquivo PDF escaneado ou digital e veja se os requisitos estão presentes.")
+def gerar_relatorio_encontrados(encontrados):
+    doc = Document()
+    doc.add_heading('Requisitos Encontrados', level=1)
+    for req, pags in encontrados.items():
+        doc.add_paragraph(f'{req} - Página(s): {", ".join(map(str, pags))}')
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
 
-    uploaded_file = st.file_uploader("Carregue o arquivo PDF", type=["pdf"])
+def gerar_relatorio_nao_encontrados(nao_encontrados):
+    doc = Document()
+    doc.add_heading('Requisitos Não Encontrados', level=1)
+    for req in nao_encontrados:
+        doc.add_paragraph(req)
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
 
-    if uploaded_file:
-        def processar_pdf(file):
-            imagens = convert_from_bytes(file.read())
-            encontrados = {}
+st.set_page_config(page_title="Analisador de Requisitos em PDF", page_icon="📄", layout="wide")
+st.title("Analisador de Requisitos em PDF")
 
-            for i, imagem in enumerate(imagens):
-                texto = pytesseract.image_to_string(imagem, lang='por')
-                for req in requisitos:
-                    if req.lower() in texto.lower() and req not in encontrados:
-                        encontrados[req] = i + 1
+st.markdown("""
+Esta ferramenta permite analisar documentos PDF escaneados em busca de requisitos específicos. 
+Faça o upload de um arquivo PDF e obtenha relatórios dos requisitos encontrados e não encontrados.
+""")
 
-            nao_encontrados = [r for r in requisitos if r not in encontrados]
-            return encontrados, nao_encontrados
+uploaded_file = st.file_uploader("Carregue o arquivo PDF", type="pdf")
 
-        with st.spinner("🔍 Analisando o documento com OCR..."):
-            encontrados, nao_encontrados = processar_pdf(uploaded_file)
+if uploaded_file is not None:
+    with st.spinner('Analisando o documento...'):
+        encontrados, nao_encontrados = processar_pdf(uploaded_file)
+        st.success('Análise concluída!')
 
-        st.success("✅ Análise concluída!")
+        col1, col2 = st.columns(2)
 
-        st.subheader("📌 Requisitos Encontrados")
-        if encontrados:
-            for req, pagina in encontrados.items():
-                st.markdown(f"- **{req}** encontrado na página {pagina}")
-        else:
-            st.write("Nenhum requisito foi encontrado.")
+        with col1:
+            st.subheader("Requisitos Encontrados")
+            if encontrados:
+                for req, pags in encontrados.items():
+                    st.write(f'**{req}** - Página(s): {", ".join(map(str, pags))}')
+                buffer = gerar_relatorio_encontrados(encontrados)
+                st.download_button(
+                    label="Baixar Relatório de Requisitos Encontrados",
+                    data=buffer,
+                    file_name="requisitos_encontrados.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+            else:
+                st.write("Nenhum requisito encontrado.")
 
-        st.subheader("🚫 Requisitos Não Encontrados")
-        if nao_encontrados:
-            for req in nao_encontrados:
-                st.markdown(f"- {req}")
-        else:
-            st.markdown("- Todos os requisitos foram encontrados.")
-    else:
-        st.info("⬆️ Faça upload de um arquivo PDF para iniciar a análise.")
+        with col2:
+            st.subheader("Requisitos Não Encontrados")
+            if nao_encontrados:
+                for req in nao_encontrados:
+                    st.write(f'**{req}**')
+                buffer = gerar_relatorio_nao_encontrados(nao_encontrados)
+                st.download_button(
+                    label="Baixar Relatório de Requisitos Não Encontrados",
+                    data=buffer,
+                    file_name="requisitos_nao_encontrados.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+            else:
+                st.write("Todos os requisitos foram encontrados no documento.")
