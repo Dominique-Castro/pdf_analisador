@@ -1,6 +1,5 @@
-
 streamlit
-pytesseract
 pdf2image
-opencv-python-headless
-python-docx
+PyPDF2
+pytesseract
+pillow
