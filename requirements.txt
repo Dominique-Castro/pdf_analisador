@@ -1,5 +1,5 @@
 streamlit
 pdf2image
-PyPDF2
 pytesseract
+python-docx
 pillow
