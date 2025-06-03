@@ -1,9 +1,9 @@
-
 import streamlit as st
 from pdf2image import convert_from_bytes
 import pytesseract
 from docx import Document
 import io
+from datetime import datetime
 
 REQUISITOS = [
     "Portaria da Sindicância Especial", "Parte de acidente",
@@ -16,12 +16,21 @@ REQUISITOS = [
 ]
 
 def processar_pdf(uploaded_file):
-    imagens = convert_from_bytes(uploaded_file.read())
+    try:
+        imagens = convert_from_bytes(uploaded_file.read())
+    except Exception as e:
+        st.error(f"Erro ao processar o PDF: {e}")
+        return None, None
+
     encontrados = {}
     texto_por_pagina = []
 
     for i, imagem in enumerate(imagens):
-        texto = pytesseract.image_to_string(imagem, lang='por')
+        try:
+            texto = pytesseract.image_to_string(imagem, lang='por')
+        except Exception as e:
+            st.error(f"Erro ao extrair texto da página {i+1}: {e}")
+            texto = ""
         texto_por_pagina.append(texto)
         for requisito in REQUISITOS:
             if requisito.lower() in texto.lower():
@@ -35,6 +44,7 @@ def processar_pdf(uploaded_file):
 def gerar_relatorio_encontrados(encontrados):
     doc = Document()
     doc.add_heading('Requisitos Encontrados', level=1)
+    doc.add_paragraph(f'Data da análise: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}')
     for req, pags in encontrados.items():
         doc.add_paragraph(f'{req} - Página(s): {", ".join(map(str, pags))}')
     buffer = io.BytesIO()
@@ -45,6 +55,7 @@ def gerar_relatorio_encontrados(encontrados):
 def gerar_relatorio_nao_encontrados(nao_encontrados):
     doc = Document()
     doc.add_heading('Requisitos Não Encontrados', level=1)
+    doc.add_paragraph(f'Data da análise: {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}')
     for req in nao_encontrados:
         doc.add_paragraph(req)
     buffer = io.BytesIO()
@@ -63,38 +74,57 @@ Faça o upload de um arquivo PDF e obtenha relatórios dos requisitos encontrado
 uploaded_file = st.file_uploader("Carregue o arquivo PDF", type="pdf")
 
 if uploaded_file is not None:
-    with st.spinner('Analisando o documento...'):
-        encontrados, nao_encontrados = processar_pdf(uploaded_file)
-        st.success('Análise concluída!')
+    # Validar tamanho do arquivo PDF (exemplo limite 20MB)
+    if uploaded_file.size > 20 * 1024 * 1024:
+        st.error("Arquivo muito grande. Por favor, envie um arquivo menor que 20MB.")
+    else:
+        with st.spinner('Analisando o documento...'):
+            encontrados, nao_encontrados = processar_pdf(uploaded_file)
+        if encontrados is not None and nao_encontrados is not None:
+            st.success('Análise concluída!')
 
-        col1, col2 = st.columns(2)
+            # Mostrar pré-visualização básica do PDF usando um componente embutido
+            st.subheader("Pré-visualização do PDF")
+            try:
+                pdf_bytes = uploaded_file.getvalue()
+                st.download_button("Baixar PDF Original", data=pdf_bytes, file_name=uploaded_file.name, mime="application/pdf")
+                # Embed PDF (funciona em alguns navegadores)
+                base64_pdf = st.experimental_get_query_params()  # workaround para evitar warning
+                import base64
+                base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="400" type="application/pdf"></iframe>'
+                st.markdown(pdf_display, unsafe_allow_html=True)
+            except Exception as e:
+                st.warning(f"Não foi possível exibir o PDF na pré-visualização ({e}).")
 
-        with col1:
-            st.subheader("Requisitos Encontrados")
-            if encontrados:
-                for req, pags in encontrados.items():
-                    st.write(f'**{req}** - Página(s): {", ".join(map(str, pags))}')
-                buffer = gerar_relatorio_encontrados(encontrados)
-                st.download_button(
-                    label="Baixar Relatório de Requisitos Encontrados",
-                    data=buffer,
-                    file_name="requisitos_encontrados.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
-            else:
-                st.write("Nenhum requisito encontrado.")
+            col1, col2 = st.columns(2)
 
-        with col2:
-            st.subheader("Requisitos Não Encontrados")
-            if nao_encontrados:
-                for req in nao_encontrados:
-                    st.write(f'**{req}**')
-                buffer = gerar_relatorio_nao_encontrados(nao_encontrados)
-                st.download_button(
-                    label="Baixar Relatório de Requisitos Não Encontrados",
-                    data=buffer,
-                    file_name="requisitos_nao_encontrados.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
-            else:
-                st.write("Todos os requisitos foram encontrados no documento.")
+            with col1:
+                st.subheader("Requisitos Encontrados")
+                if encontrados:
+                    for req, pags in encontrados.items():
+                        st.write(f'**{req}** - Página(s): {", ".join(map(str, pags))}')
+                    buffer = gerar_relatorio_encontrados(encontrados)
+                    st.download_button(
+                        label="Baixar Relatório de Requisitos Encontrados",
+                        data=buffer,
+                        file_name="requisitos_encontrados.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+                else:
+                    st.write("Nenhum requisito encontrado.")
+
+            with col2:
+                st.subheader("Requisitos Não Encontrados")
+                if nao_encontrados:
+                    for req in nao_encontrados:
+                        st.write(f'**{req}**')
+                    buffer = gerar_relatorio_nao_encontrados(nao_encontrados)
+                    st.download_button(
+                        label="Baixar Relatório de Requisitos Não Encontrados",
+                        data=buffer,
+                        file_name="requisitos_nao_encontrados.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+                else:
+                    st.write("Todos os requisitos foram encontrados no documento.")
