@@ -68,15 +68,15 @@ def gerar_relatorio_nao_encontrados(nao_encontrados):
     buffer.seek(0)
     return buffer
 
-st.set_page_config(page_title="Analisador de Requisitos em PDF", page_icon="📄", layout="wide")
-st.title("Analisador de Requisitos em PDF")
+st.set_page_config(page_title="Analisador de Acidentes de Serviço BM em PDF", page_icon="📄", layout="wide")
+st.title("Analisador de Acidentes de Serviço BM em PDF")
 
 st.markdown("""
 Esta ferramenta permite analisar documentos PDF escaneados em busca de requisitos específicos. 
 Faça o upload de um arquivo PDF e obtenha relatórios dos requisitos encontrados e não encontrados.
 """)
 
-uploaded_file = st.file_uploader("Carregue o arquivo PDF", type="pdf")
+uploaded_file = st.file_uploader("Carregue o arquivo PDF - PROA", type="pdf")
 
 if uploaded_file is not None:
     if uploaded_file.size > 20 * 1024 * 1024:
