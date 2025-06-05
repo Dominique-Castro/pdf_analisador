@@ -128,3 +128,4 @@ if uploaded_file is not None:
                     )
                 else:
                     st.write("Todos os requisitos foram encontrados no documento.")
+
