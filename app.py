@@ -1,6 +1,8 @@
 import streamlit as st
 from pdf2image import convert_from_bytes
-import pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+import pytesseract
+pytesseract.tesseract
+_cmd = "/usr/bin/tesseract"
 from docx import Document
 import io
 from datetime import datetime
