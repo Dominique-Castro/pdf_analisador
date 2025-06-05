@@ -1,11 +1,14 @@
 import streamlit as st
 from pdf2image import convert_from_bytes
 import pytesseract
-pytesseract.tesseract
-_cmd = "/usr/bin/tesseract"
 from docx import Document
 import io
 from datetime import datetime
+from PIL import Image
+import base64
+
+# Caminho do executável do Tesseract no ambiente do Streamlit Cloud
+pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
 REQUISITOS = [
     "Portaria da Sindicância Especial", "Parte de acidente",
@@ -76,7 +79,6 @@ Faça o upload de um arquivo PDF e obtenha relatórios dos requisitos encontrado
 uploaded_file = st.file_uploader("Carregue o arquivo PDF", type="pdf")
 
 if uploaded_file is not None:
-    # Validar tamanho do arquivo PDF (exemplo limite 20MB)
     if uploaded_file.size > 20 * 1024 * 1024:
         st.error("Arquivo muito grande. Por favor, envie um arquivo menor que 20MB.")
     else:
@@ -85,14 +87,10 @@ if uploaded_file is not None:
         if encontrados is not None and nao_encontrados is not None:
             st.success('Análise concluída!')
 
-            # Mostrar pré-visualização básica do PDF usando um componente embutido
             st.subheader("Pré-visualização do PDF")
             try:
                 pdf_bytes = uploaded_file.getvalue()
                 st.download_button("Baixar PDF Original", data=pdf_bytes, file_name=uploaded_file.name, mime="application/pdf")
-                # Embed PDF (funciona em alguns navegadores)
-                base64_pdf = st.experimental_get_query_params()  # workaround para evitar warning
-                import base64
                 base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
                 pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="400" type="application/pdf"></iframe>'
                 st.markdown(pdf_display, unsafe_allow_html=True)
