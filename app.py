@@ -10,6 +10,7 @@ import base64
 # Caminho do executável do Tesseract no ambiente do Streamlit Cloud
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
+# Lista de requisitos
 REQUISITOS = [
     "Portaria da Sindicância Especial", "Parte de acidente",
     "Atestado de Origem", "Primeiro Boletim de atendimento médico",
@@ -68,15 +69,23 @@ def gerar_relatorio_nao_encontrados(nao_encontrados):
     buffer.seek(0)
     return buffer
 
-st.set_page_config(page_title="Analisador de Acidentes de Serviço BM em PDF", page_icon="📄", layout="wide")
-st.title("Analisador de Acidentes de Serviço BM em PDF")
+# Configuração da página
+st.set_page_config(page_title="Analisador de Requisitos em PDF", page_icon="📄", layout="wide")
 
+# Exibir logotipo
+st.image("logo.png", width=150)
+
+# Título do app
+st.title("Analisador de Requisitos em PDF")
+
+# Descrição do app
 st.markdown("""
 Esta ferramenta permite analisar documentos PDF escaneados em busca de requisitos específicos. 
 Faça o upload de um arquivo PDF e obtenha relatórios dos requisitos encontrados e não encontrados.
 """)
 
-uploaded_file = st.file_uploader("Carregue o arquivo PDF - PROA", type="pdf")
+# Upload do arquivo PDF
+uploaded_file = st.file_uploader("Carregue o arquivo PDF", type="pdf")
 
 if uploaded_file is not None:
     if uploaded_file.size > 20 * 1024 * 1024:
@@ -128,4 +137,8 @@ if uploaded_file is not None:
                     )
                 else:
                     st.write("Todos os requisitos foram encontrados no documento.")
+
+# Créditos ao criador
+st.sidebar.markdown("---")
+st.sidebar.markdown("Desenvolvido por **SD PM Dominique Castro** – Seção de Afastamentos e Acidentes (SAA)")
 
