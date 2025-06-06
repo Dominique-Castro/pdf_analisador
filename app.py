@@ -284,7 +284,7 @@ st.sidebar.markdown("""
 ### 🔍 Sobre o Sistema
 **SAA - Sistema de Análise Documental**  
 Ferramenta para verificação de documentos em processos administrativos, conforme:  
-- Portaria BM nº 32.280/1986
+- Decreto nº 32.280/1986
 - NI EMBM 1.26/2023
 - Regulamento da Corporação
 """)
