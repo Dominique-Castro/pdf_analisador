@@ -6,6 +6,20 @@ import io
 from datetime import datetime
 import base64
 import os
+import logging
+
+# Configuração de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Verificação de dependências
+try:
+    from pdf2image import convert_from_bytes
+    import pytesseract
+    from docx import Document
+except ImportError as e:
+    st.error(f"Erro de dependência: {e}")
+    st.stop()
 
 # Configuração do Tesseract
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
@@ -104,6 +118,14 @@ st.markdown("""
         border-radius: 4px;
         font-size: 0.8em;
     }
+    
+    .error-box {
+        background-color: #FFEBEE;
+        border-left: 4px solid #C62828;
+        padding: 12px;
+        border-radius: 6px;
+        margin: 8px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -121,29 +143,60 @@ st.markdown("""
 # Funções de processamento
 def processar_pdf(uploaded_file):
     try:
-        imagens = convert_from_bytes(uploaded_file.read())
+        # Garante que o ponteiro do arquivo está no início
+        uploaded_file.seek(0)
+        
+        # Converte PDF para imagens com configuração otimizada
+        imagens = convert_from_bytes(
+            uploaded_file.read(),
+            dpi=300,
+            thread_count=4,
+            fmt='jpeg'
+        )
+        
+        encontrados = {}
+        texto_por_pagina = []
+
+        for i, imagem in enumerate(imagens):
+            try:
+                # Configuração melhorada para OCR
+                texto = pytesseract.image_to_string(
+                    imagem, 
+                    lang='por',
+                    config='--psm 6 --oem 3'  # Modo de segmentação e OCR engine
+                )
+                texto_por_pagina.append(texto)
+                
+                # Verifica cada requisito no texto extraído
+                for requisito in REQUISITOS:
+                    if requisito.lower() in texto.lower():
+                        if requisito not in encontrados:
+                            encontrados[requisito] = []
+                        encontrados[requisito].append(i + 1)
+                        
+            except Exception as e:
+                logger.error(f"Erro ao processar página {i+1}: {str(e)}")
+                st.error(f"Erro ao processar página {i+1}")
+                continue
+
+        nao_encontrados = [r for r in REQUISITOS if r not in encontrados]
+        return encontrados, nao_encontrados
+        
     except Exception as e:
-        st.error(f"Erro ao processar o PDF: {e}")
+        logger.error(f"Erro grave ao processar o PDF: {str(e)}", exc_info=True)
+        st.error(f"""
+        <div class="error-box">
+            <b>Erro ao processar o PDF:</b><br>
+            {str(e)}<br><br>
+            Por favor, verifique se:
+            <ul>
+                <li>O arquivo não está protegido por senha</li>
+                <li>O arquivo não está corrompido</li>
+                <li>O conteúdo está legível (não são apenas imagens)</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
         return None, None
-
-    encontrados = {}
-    texto_por_pagina = []
-
-    for i, imagem in enumerate(imagens):
-        try:
-            texto = pytesseract.image_to_string(imagem, lang='por')
-        except Exception as e:
-            st.error(f"Erro ao extrair texto da página {i+1}: {e}")
-            texto = ""
-        texto_por_pagina.append(texto)
-        for requisito in REQUISITOS:
-            if requisito.lower() in texto.lower():
-                if requisito not in encontrados:
-                    encontrados[requisito] = []
-                encontrados[requisito].append(i + 1)
-
-    nao_encontrados = [r for r in REQUISITOS if r not in encontrados]
-    return encontrados, nao_encontrados
 
 def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_processo=None):
     doc = Document()
@@ -208,75 +261,99 @@ with st.container(border=True):
 # Upload do documento
 with st.container(border=True):
     st.subheader("📂 Documento para Análise")
-    uploaded_file = st.file_uploader("Carregue o arquivo PDF do processo", type="pdf")
+    uploaded_file = st.file_uploader("Carregue o arquivo PDF do processo", type=["pdf"])
+    
+    if uploaded_file is not None:
+        # Verifica se é realmente um PDF
+        if uploaded_file.type != "application/pdf":
+            st.error("Por favor, envie um arquivo PDF válido.")
+            st.stop()
+        
+        # Verifica tamanho do arquivo
+        if uploaded_file.size > 50 * 1024 * 1024:  # 50MB
+            st.error("Arquivo muito grande. Tamanho máximo permitido: 50MB")
+            st.stop()
 
 # Processamento e resultados
 if uploaded_file is not None:
-    if uploaded_file.size > 20 * 1024 * 1024:
-        st.error("Arquivo muito grande. Por favor, envie um arquivo menor que 20MB.")
-    else:
-        with st.spinner('Analisando o documento...'):
+    try:
+        with st.spinner('Analisando o documento... Isso pode levar alguns minutos para arquivos grandes...'):
             encontrados, nao_encontrados = processar_pdf(uploaded_file)
+            
+            if encontrados is None or nao_encontrados is None:
+                st.error("Falha na análise do documento. Verifique o arquivo e tente novamente.")
+                st.stop()
+                
+        st.success('Análise concluída com sucesso!')
         
-        if encontrados is not None and nao_encontrados is not None:
-            st.success('Análise concluída com sucesso!')
-            
-            # Visualização do documento
-            with st.expander("📄 Visualizar Documento", expanded=False):
-                try:
-                    pdf_bytes = uploaded_file.getvalue()
-                    base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
-                    pdf_display = f"""
-                    <div style="border: 1px solid var(--dourado); border-radius: 8px; padding: 10px;">
-                        <iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500"></iframe>
-                    </div>
-                    """
-                    st.markdown(pdf_display, unsafe_allow_html=True)
-                except Exception as e:
-                    st.warning(f"Não foi possível exibir o PDF ({e})")
+        # Visualização do documento
+        with st.expander("📄 Visualizar Documento", expanded=False):
+            try:
+                uploaded_file.seek(0)
+                pdf_bytes = uploaded_file.read()
+                base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+                pdf_display = f"""
+                <div style="border: 1px solid var(--dourado); border-radius: 8px; padding: 10px;">
+                    <iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500"></iframe>
+                </div>
+                """
+                st.markdown(pdf_display, unsafe_allow_html=True)
+            except Exception as e:
+                logger.error(f"Erro ao exibir PDF: {str(e)}")
+                st.warning(f"Não foi possível exibir o PDF. Erro: {str(e)}")
 
-            # Resultados da análise
-            tab1, tab2 = st.tabs(["✅ Documentos Encontrados", "❌ Documentos Faltantes"])
-            
-            with tab1:
-                with st.container(border=True):
-                    if encontrados:
-                        st.markdown(f"**{len(encontrados)} de {len(REQUISITOS)} documentos encontrados**")
-                        progresso = len(encontrados)/len(REQUISITOS)
-                        st.progress(progresso, text=f"Completude: {progresso:.0%}")
-                        
-                        for req, pags in encontrados.items():
-                            st.markdown(f"""
-                            <div style="padding: 12px; margin: 8px 0; background-color: #E8F5E9; border-radius: 6px; border-left: 4px solid var(--verde-bm);">
-                                <b>{req}</b><br>
-                                <span class="badge">Páginas: {", ".join(map(str, pags))}</span>
-                            </div>
-                            """, unsafe_allow_html=True)
-                    else:
-                        st.warning("Nenhum documento requerido foi encontrado.")
+        # Resultados da análise
+        tab1, tab2 = st.tabs(["✅ Documentos Encontrados", "❌ Documentos Faltantes"])
+        
+        with tab1:
+            with st.container(border=True):
+                if encontrados:
+                    st.markdown(f"**{len(encontrados)} de {len(REQUISITOS)} documentos encontrados**")
+                    progresso = len(encontrados)/len(REQUISITOS)
+                    st.progress(progresso, text=f"Completude: {progresso:.0%}")
+                    
+                    for req, pags in encontrados.items():
+                        st.markdown(f"""
+                        <div style="padding: 12px; margin: 8px 0; background-color: #E8F5E9; border-radius: 6px; border-left: 4px solid var(--verde-bm);">
+                            <b>{req}</b><br>
+                            <span class="badge">Páginas: {", ".join(map(str, pags))}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.warning("Nenhum documento requerido foi encontrado.")
 
-            with tab2:
-                with st.container(border=True):
-                    if nao_encontrados:
-                        st.markdown(f"**{len(nao_encontrados)} documentos não encontrados**")
-                        
-                        for req in nao_encontrados:
-                            st.markdown(f"""
-                            <div style="padding: 12px; margin: 8px 0; background-color: #FFEBEE; border-radius: 6px; border-left: 4px solid #C62828;">
-                                {req}
-                            </div>
-                            """, unsafe_allow_html=True)
-                    else:
-                        st.success("Todos os documentos requeridos foram encontrados!")
+        with tab2:
+            with st.container(border=True):
+                if nao_encontrados:
+                    st.markdown(f"**{len(nao_encontrados)} documentos não encontrados**")
+                    
+                    for req in nao_encontrados:
+                        st.markdown(f"""
+                        <div style="padding: 12px; margin: 8px 0; background-color: #FFEBEE; border-radius: 6px; border-left: 4px solid #C62828;">
+                            {req}
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.success("Todos os documentos requeridos foram encontrados!")
 
-            # Relatórios
-            st.download_button(
-                label="📄 Baixar Relatório Completo (DOCX)",
-                data=gerar_relatorio(encontrados, nao_encontrados, data_acidente, numero_processo),
-                file_name=f"relatorio_{numero_processo or datetime.now().strftime('%Y%m%d')}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
+        # Relatórios
+        st.download_button(
+            label="📄 Baixar Relatório Completo (DOCX)",
+            data=gerar_relatorio(encontrados, nao_encontrados, data_acidente, numero_processo),
+            file_name=f"relatorio_{numero_processo or datetime.now().strftime('%Y%m%d')}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
+
+    except Exception as e:
+        logger.error(f"Erro inesperado: {str(e)}", exc_info=True)
+        st.error(f"""
+        <div class="error-box">
+            <b>Erro inesperado:</b><br>
+            {str(e)}<br><br>
+            Por favor, tente novamente. Se o problema persistir, contate o suporte técnico.
+        </div>
+        """, unsafe_allow_html=True)
 
 # Sidebar institucional
 st.sidebar.image("https://www.brigadamilitar.rs.gov.br/upload/recortes/202005/12153026_92567_TH.jpg", use_container_width=True)
@@ -303,5 +380,5 @@ Seção de Afastamentos e Acidentes
 📞 (51) 986371192 
 ✉ dadp-saa@bm.rs.gov.br  
 
-*Versão 1.0 - {year}*  
+*Versão 1.1 - {year}*  
 """.format(year=datetime.now().year))
