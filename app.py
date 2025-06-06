@@ -279,7 +279,7 @@ if uploaded_file is not None:
             )
 
 # Sidebar institucional
-st.sidebar.image("https://www.brigadamilitar.rs.gov.br/upload/recortes/202005/12153026_92567_TH.jpg", use_column_width=True)
+st.sidebar.image("https://www.brigadamilitar.rs.gov.br/upload/recortes/202005/12153026_92567_TH.jpg", use_container_width=True)
 st.sidebar.markdown("""
 ### 🔍 Sobre o Sistema
 **SAA - Sistema de Análise Documental**  
