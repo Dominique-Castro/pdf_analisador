@@ -171,16 +171,24 @@ def extrair_data_acidente(texto):
         r"Data do Acidente:?\s*(\d{2}/\d{2}/\d{4})",
         r"Acidente ocorrido em:?\s*(\d{2}/\d{2}/\d{4})",
         r"(\d{2}/\d{2}/\d{4}).*?(acidente|sinistro)",
-        r"(?<!\d)(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[012])/(19|20)\d{2}(?!\d)"  # formato genérico
+        r"(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[012])/(19|20)\d{2}"  # formato genérico
     ]
     
     for padrao in padroes:
         matches = re.search(padrao, texto, re.IGNORECASE)
         if matches:
             try:
-                data_str = matches.group(1) if matches.groups() > 1 else matches.group(0)
+                # Verifica quantos grupos foram capturados
+                if len(matches.groups()) > 1:
+                    # Se houver grupos separados (dia, mês, ano)
+                    dia, mes, ano = matches.groups()[0], matches.groups()[1], matches.groups()[2]
+                    data_str = f"{dia}/{mes}/{ano}"
+                else:
+                    data_str = matches.group(1) if matches.groups() else matches.group(0)
+                
                 return datetime.strptime(data_str, "%d/%m/%Y").date()
-            except ValueError:
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Erro ao converter data: {e}")
                 continue
     return None
 
@@ -227,7 +235,7 @@ def processar_pdf(uploaded_file):
         
     except Exception as e:
         logger.error(f"Erro grave ao processar o PDF: {str(e)}", exc_info=True)
-        st.error(f"""
+        st.markdown(f"""
         <div class="error-box">
             <b>Erro ao processar o PDF:</b><br>
             {str(e)}<br><br>
@@ -287,7 +295,7 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
     buffer.seek(0)
     return buffer
 
-# Formulário de informações (agora com campos preenchidos automaticamente)
+# Formulário de informações
 with st.container(border=True):
     st.subheader("📋 Informações do Processo")
     col1, col2 = st.columns(2)
@@ -303,11 +311,19 @@ with st.container(border=True):
     
     if uploaded_file is not None:
         if uploaded_file.type != "application/pdf":
-            st.error("Por favor, envie um arquivo PDF válido.")
+            st.markdown("""
+            <div class="error-box">
+                Por favor, envie um arquivo PDF válido.
+            </div>
+            """, unsafe_allow_html=True)
             st.stop()
         
         if uploaded_file.size > 50 * 1024 * 1024:
-            st.error("Arquivo muito grande. Tamanho máximo permitido: 50MB")
+            st.markdown("""
+            <div class="error-box">
+                Arquivo muito grande. Tamanho máximo permitido: 50MB
+            </div>
+            """, unsafe_allow_html=True)
             st.stop()
 
 # Processamento e resultados
@@ -317,7 +333,11 @@ if uploaded_file is not None:
             encontrados, nao_encontrados, texto_completo = processar_pdf(uploaded_file)
             
             if encontrados is None or nao_encontrados is None:
-                st.error("Falha na análise do documento. Verifique o arquivo e tente novamente.")
+                st.markdown("""
+                <div class="error-box">
+                    Falha na análise do documento. Verifique o arquivo e tente novamente.
+                </div>
+                """, unsafe_allow_html=True)
                 st.stop()
                 
         # Extrai e preenche automaticamente os campos
@@ -356,7 +376,11 @@ if uploaded_file is not None:
                 st.markdown(pdf_display, unsafe_allow_html=True)
             except Exception as e:
                 logger.error(f"Erro ao exibir PDF: {str(e)}")
-                st.warning(f"Não foi possível exibir o PDF. Erro: {str(e)}")
+                st.markdown(f"""
+                <div class="error-box">
+                    Não foi possível exibir o PDF. Erro: {str(e)}
+                </div>
+                """, unsafe_allow_html=True)
 
         # Resultados da análise
         tab1, tab2 = st.tabs(["✅ Documentos Encontrados", "❌ Documentos Faltantes"])
@@ -376,7 +400,11 @@ if uploaded_file is not None:
                         </div>
                         """, unsafe_allow_html=True)
                 else:
-                    st.warning("Nenhum documento requerido foi encontrado.")
+                    st.markdown("""
+                    <div class="error-box">
+                        Nenhum documento requerido foi encontrado.
+                    </div>
+                    """, unsafe_allow_html=True)
 
         with tab2:
             with st.container(border=True):
@@ -390,7 +418,11 @@ if uploaded_file is not None:
                         </div>
                         """, unsafe_allow_html=True)
                 else:
-                    st.success("Todos os documentos requeridos foram encontrados!")
+                    st.markdown("""
+                    <div class="info-box">
+                        Todos os documentos requeridos foram encontrados!
+                    </div>
+                    """, unsafe_allow_html=True)
 
         # Relatórios
         st.download_button(
@@ -408,7 +440,7 @@ if uploaded_file is not None:
 
     except Exception as e:
         logger.error(f"Erro inesperado: {str(e)}", exc_info=True)
-        st.error(f"""
+        st.markdown(f"""
         <div class="error-box">
             <b>Erro inesperado:</b><br>
             {str(e)}<br><br>
@@ -442,4 +474,4 @@ Seção de Afastamentos e Acidentes
 ✉ dadp-saa@bm.rs.gov.br  
 
 *Versão 1.2 - {year}*  
-""".format(year=datetime.now().year))
+""".format(year=datetime.now().year), unsafe_allow_html=True)
