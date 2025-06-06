@@ -6,6 +6,7 @@ import io
 from datetime import datetime
 from PIL import Image
 import base64
+import os
 
 # Caminho do executável do Tesseract no ambiente do Streamlit Cloud
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
@@ -72,8 +73,14 @@ def gerar_relatorio_nao_encontrados(nao_encontrados):
 # Configuração da página
 st.set_page_config(page_title="Analisador de Requisitos em PDF", page_icon="📄", layout="wide")
 
-# Exibir logotipo
-st.image("logo.png", width=150)
+# Exibir logotipo - SOLUÇÃO PARA O PROBLEMA
+try:
+    # Tenta carregar o logo da pasta do app
+    logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+    st.image(logo_path, width=150)
+except Exception as e:
+    st.warning("Logo não encontrado. O aplicativo continuará sem o logo.")
+    # Alternativa: usar um placeholder ou continuar sem imagem
 
 # Título do app
 st.title("Analisador de Requisitos em PDF")
@@ -141,4 +148,3 @@ if uploaded_file is not None:
 # Créditos ao criador
 st.sidebar.markdown("---")
 st.sidebar.markdown("Desenvolvido por **SD PM Dominique Castro** – Seção de Afastamentos e Acidentes (SAA)")
-
