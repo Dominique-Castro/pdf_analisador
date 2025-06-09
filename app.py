@@ -153,7 +153,7 @@ st.markdown("""
 def extrair_numero_processo(texto):
     """Extrai número do processo no formato padrão da BM/RS"""
     padroes = [
-        r"\d{4}\.\d{4}\.\d{4}-\d",  # 2023.1234.5678-9
+        r"\d{4}\.\d{4}\.\d{4}-\d",  # 25/1203-0011111-0
         r"\d{4}\.\d{3,4}\/\d{4}",    # 2023.123/2024
         r"PAA-\d{4}\/\d{4}",          # PAA-2023/2024
         r"PA-\d{4}\/\d{4}",           # PA-2023/2024
@@ -166,7 +166,7 @@ def extrair_numero_processo(texto):
     return None
 
 def extrair_data_acidente(texto):
-    """Extrai data do acidente no formato dd/mm/aaaa"""
+    """Extrai data do acidente no formato dd-mm-aaaa"""
     padroes = [
         r"Data do Acidente:?\s*(\d{2}/\d{2}/\d{4})",
         r"Acidente ocorrido em:?\s*(\d{2}/\d{2}/\d{4})",
@@ -449,7 +449,7 @@ if uploaded_file is not None:
         """, unsafe_allow_html=True)
 
 # Sidebar institucional
-st.sidebar.image("https://www.brigadamilitar.rs.gov.br/upload/recortes/202005/12153026_92567_TH.jpg", use_container_width=True)
+st.sidebar.image("https://https://br.pinterest.com/pin/6614730698024787/", use_container_width=True)
 st.sidebar.markdown("""
 ### 🔍 Sobre o Sistema
 **SAA - Sistema de Análise Documental**  
