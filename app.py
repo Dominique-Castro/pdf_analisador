@@ -5,7 +5,6 @@ from docx import Document
 import io
 from datetime import datetime
 import base64
-import os
 import logging
 import re
 
@@ -468,3 +467,4 @@ st.sidebar.markdown("""
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 ### 📌 Responsável Técnico do App
+**SD BM Dominique Castro**
