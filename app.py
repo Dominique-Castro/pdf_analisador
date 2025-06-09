@@ -35,7 +35,7 @@ REQUISITOS = [
     "Conclusão da Autoridade nomeante", "RHE", "LTS"
 ]
 
-# Configuração da página
+# Configuração da página com design moderno e limpo
 st.set_page_config(
     page_title="Sistema de Análise Documental - BM/RS",
     page_icon="🛡️",
@@ -43,141 +43,183 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizado com tema institucional e estilo elegante e clean
+# CSS aplicado segundo guideline default - minimalista e elegante
 st.markdown("""
 <style>
-    :root {
-        --verde-bm: #006341;
-        --dourado: #D4AF37;
-        --cinza-escuro: #333333;
-        --branco: #FFFFFF;
-        --bege: #F5F5DC;
-        --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        --radius: 12px;
-        --shadow-light: 0 4px 8px rgba(0,0,0,0.05);
-    }
+  :root {
+    --color-bg: #ffffff;
+    --color-text: #6b7280;
+    --color-primary: #111827;
+    --color-accent: #000000;
+    --border-radius: 0.75rem;
+    --shadow-light: 0 2px 8px rgba(0,0,0,0.05);
+    --font-headings: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-body: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
 
+  body, .stApp {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    max-width: 1200px;
+    margin: 3rem auto 5rem auto;
+    padding: 0 2rem;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    background: var(--color-bg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0;
+    box-shadow: var(--shadow-light);
+    margin-bottom: 3rem;
+    z-index: 999;
+  }
+
+  header h1 {
+    font-family: var(--font-headings);
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin: 0;
+  }
+
+  .logo-img {
+    height: 52px;
+    width: auto;
+  }
+
+  section {
+    background: var(--color-bg);
+    box-shadow: var(--shadow-light);
+    border-radius: var(--border-radius);
+    padding: 2rem 3rem;
+    margin-bottom: 3rem;
+  }
+
+  h2 {
+    font-family: var(--font-headings);
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    margin-bottom: 1.5rem;
+  }
+
+  label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--color-primary);
+  }
+
+  input[type="text"], input[type="date"], .stFileUploader>div>input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: var(--border-radius);
+    border: 1.5px solid #d1d5db;
+    font-size: 1.125rem;
+    margin-bottom: 2rem;
+    box-sizing: border-box;
+  }
+
+  .stButton > button {
+    background-color: var(--color-accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.125rem;
+    padding: 0.75rem 2.5rem;
+    border-radius: var(--border-radius);
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.25s ease;
+  }
+
+  .stButton > button:hover {
+    background-color: #333333;
+  }
+
+  .badge {
+    display: inline-block;
+    background-color: var(--color-accent);
+    color: #fff;
+    padding: 0.4rem 1rem;
+    border-radius: var(--border-radius);
+    font-weight: 700;
+    font-size: 0.875rem;
+    margin-top: 0.3rem;
+  }
+
+  .error-box {
+    background-color: #FEF2F2;
+    border-left: 5px solid #F87171;
+    padding: 1rem 1.5rem;
+    border-radius: var(--border-radius);
+    color: #B91C1C;
+    font-weight: 600;
+    margin-bottom: 2rem;
+  }
+
+  .info-box {
+    background-color: #EFF6FF;
+    border-left: 5px solid #3B82F6;
+    padding: 1rem 1.5rem;
+    border-radius: var(--border-radius);
+    color: #1E40AF;
+    font-weight: 600;
+    margin-bottom: 2rem;
+  }
+
+  iframe {
+    border-radius: var(--border-radius);
+    border: 1px solid #d1d5db;
+    width: 100%;
+    height: 500px;
+  }
+
+  /* Responsive padding for smaller screens */
+  @media (max-width: 768px) {
     body, .stApp {
-        background-color: var(--bege);
-        font-family: var(--font-sans);
-        color: var(--cinza-escuro);
-        max-width: 1200px;
-        margin: 2rem auto 4rem auto;
-        padding: 0 1.5rem;
+      padding: 0 1rem 3rem 1rem;
     }
+    section {
+      padding: 1.5rem 2rem;
+      margin-bottom: 2rem;
+    }
+    header h1 {
+      font-size: 2rem;
+    }
+  }
 
-    h1 {
-        font-size: 48px;
-        font-weight: 700;
-        color: var(--verde-bm);
-        border-bottom: 3px solid var(--dourado);
-        padding-bottom: 12px;
-        margin-bottom: 2rem;
-    }
-
-    h2, h3 {
-        font-weight: 600;
-        color: var(--verde-bm);
-        margin-top: 1.5rem;
-        margin-bottom: 1rem;
-    }
-
-    .card {
-        background: var(--branco);
-        box-shadow: var(--shadow-light);
-        border-radius: var(--radius);
-        padding: 2rem 3rem;
-        margin-bottom: 3rem;
-    }
-
-    .stButton>button {
-        background-color: var(--verde-bm);
-        color: var(--branco);
-        font-weight: 700;
-        font-size: 18px;
-        padding: 0.625rem 2rem;
-        border-radius: var(--radius);
-        transition: background-color 0.3s ease;
-    }
-    .stButton>button:hover {
-        background-color: #004d2e;
-    }
-
-    input[type="text"], input[type="date"], .stFileUploader>div>input {
-        width: 100%;
-        padding: 0.625rem 1rem;
-        font-size: 16px;
-        border-radius: var(--radius);
-        border: 1px solid #ddd;
-        margin-top: 0.5rem;
-        margin-bottom: 1.5rem;
-        box-sizing: border-box;
-    }
-
-    label {
-        display: block;
-        font-weight: 600;
-        margin-bottom: 6px;
-    }
-
-    .badge {
-        background-color: var(--verde-bm);
-        color: white;
-        font-weight: 700;
-        font-size: 0.85rem;
-        padding: 6px 12px;
-        border-radius: var(--radius);
-        display: inline-block;
-        margin-top: 0.25rem;
-    }
-
-    .error-box {
-        background-color: #FFE5E5;
-        border-left: 5px solid #CC0000;
-        padding: 12px 20px;
-        border-radius: var(--radius);
-        margin-bottom: 1.5rem;
-        font-weight: 600;
-        color: #990000;
-    }
-
-    .info-box {
-        background-color: #E5F1FF;
-        border-left: 5px solid #0073E6;
-        padding: 12px 20px;
-        border-radius: var(--radius);
-        margin-bottom: 1.5rem;
-        font-weight: 600;
-        color: #004C99;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# Header com logo espartano e título
+# Header com logo e título
 st.markdown("""
-<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/1200px-Spartan_Helmet.svg.png" alt="Logo Espartano" style="height: 80px;">
-    <h1>Sistema de Análise Documental</h1>
-</div>
+<header>
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/600px-Spartan_Helmet.svg.png" alt="Logo Espartano" class="logo-img" />
+  <h1>Sistema de Análise Documental</h1>
+</header>
 """, unsafe_allow_html=True)
 
-# Formulário de informações do processo e upload em cartão
+# Seção Informações do Processo
 with st.container():
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<section>', unsafe_allow_html=True)
     st.subheader("📋 Informações do Processo")
     col1, col2 = st.columns(2)
     with col1:
         numero_processo = st.text_input("Número do Processo:", placeholder="Ex: 2023.1234.5678-9")
     with col2:
         data_acidente = st.date_input("Data do Acidente:", format="DD/MM/YYYY")
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('</section>', unsafe_allow_html=True)
 
+# Seção Upload Documento
 with st.container():
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<section>', unsafe_allow_html=True)
     st.subheader("📂 Documento para Análise")
     uploaded_file = st.file_uploader("Carregue o arquivo PDF do processo", type=["pdf"])
-    st.markdown("</div>", unsafe_allow_html=True)
-
     if uploaded_file:
         if uploaded_file.type != "application/pdf":
             st.markdown('<div class="error-box">Por favor, envie um arquivo PDF válido.</div>', unsafe_allow_html=True)
@@ -185,8 +227,9 @@ with st.container():
         if uploaded_file.size > 50 * 1024 * 1024:
             st.markdown('<div class="error-box">Arquivo muito grande. Tamanho máximo permitido: 50MB.</div>', unsafe_allow_html=True)
             st.stop()
+    st.markdown('</section>', unsafe_allow_html=True)
 
-# Função de processamento PDF e análise texto (igual antes, não muda)
+# Função para processar o PDF
 def processar_pdf(uploaded_file):
     try:
         uploaded_file.seek(0)
@@ -208,19 +251,10 @@ def processar_pdf(uploaded_file):
         return encontrados, nao_encontrados, texto_completo
     except Exception as e:
         logger.error(f"Erro grave ao processar o PDF: {e}", exc_info=True)
-        st.markdown(f"""
-            <div class="error-box">
-                <b>Erro ao processar o PDF:</b><br>{str(e)}<br><br>
-                Por favor, verifique se:<ul>
-                <li>O arquivo não está protegido por senha</li>
-                <li>O arquivo não está corrompido</li>
-                <li>O conteúdo está legível (não são apenas imagens)</li>
-                </ul>
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f'<div class="error-box"><b>Erro ao processar o PDF:</b> {str(e)}</div>', unsafe_allow_html=True)
         return None, None, None
 
-# Função para gerar o relatório docx (mantida igual)
+# Função para gerar relatório DOCX
 def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_processo=None):
     doc = Document()
     header_run = doc.add_paragraph().add_run("BRIGADA MILITAR DO RIO GRANDE DO SUL\n")
@@ -257,7 +291,7 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
     buffer.seek(0)
     return buffer
 
-# Mostrar resultados e botões após upload e análise
+# Processamento e exibição dos resultados
 if uploaded_file:
     try:
         with st.spinner('Analisando o documento... Isso pode levar alguns minutos para arquivos grandes...'):
@@ -266,7 +300,6 @@ if uploaded_file:
             st.markdown('<div class="error-box">Falha na análise do documento. Verifique o arquivo e tente novamente.</div>', unsafe_allow_html=True)
             st.stop()
 
-        # Mostrar resumo
         st.success('Análise concluída com sucesso!')
 
         tab1, tab2 = st.tabs(["✅ Documentos Encontrados", "❌ Documentos Faltantes"])
@@ -297,7 +330,6 @@ if uploaded_file:
             else:
                 st.markdown('<div class="info-box">Todos os documentos requeridos foram encontrados!</div>', unsafe_allow_html=True)
 
-        # Botão para baixar relatório DOCX
         st.download_button(
             label="📄 Baixar Relatório Completo (DOCX)",
             data=gerar_relatorio(
@@ -310,11 +342,12 @@ if uploaded_file:
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True
         )
+
     except Exception as e:
         logger.error(f"Erro inesperado: {e}", exc_info=True)
         st.markdown(f'<div class="error-box"><b>Erro inesperado:</b><br>{e}<br><br>Por favor, tente novamente. Se o problema persistir, contate o suporte técnico.</div>', unsafe_allow_html=True)
 
-# Sidebar moderno e clean com logo espartano
+# Sidebar com logo espartano e informações institucionais
 st.sidebar.image(
     "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/600px-Spartan_Helmet.svg.png",
     use_container_width=True
