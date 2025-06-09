@@ -448,23 +448,29 @@ if uploaded_file is not None:
         """, unsafe_allow_html=True)
 
 # Sidebar institucional
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/1200px-Spartan_Helmet.svg.png", use_container_width=True)
-st.sidebar.markdown(""")
+st.sidebar.image(
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/1200px-Spartan_Helmet.svg.png",
+    use_container_width=True
+)
+st.sidebar.markdown("""
 ### 🔍 Sobre o Sistema
 **SAA - Sistema de Análise Documental**  
 Ferramenta para verificação de documentos em processos administrativos, conforme:  
-- Decreto nº 32.280/1986
-- NI EMBM 1.26/2023
-- Regulamento da Corporação
+- Decreto nº 32.280/1986  
+- NI EMBM 1.26/2023  
+- Regulamento da Corporação  
 """)
-
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 ### 📋 Documentos Verificados
 {}
-""".format("\n".join([f"• {req}" for req in REQUISITOS]))
-
+""".format("\n".join([f"• {req}" for req in REQUISITOS])))
 st.sidebar.markdown("---")
-st.sidebar.markdown(""")
+st.sidebar.markdown(f"""
 ### 📌 Responsável Técnico do App
-**SD BM Dominique Castro**
+**SD BM Dominique Castro**  
+Seção de Afastamentos e Acidentes  
+📞 (51) 98637-1192  
+✉ dadp-saa@bm.rs.gov.br  
+*Versão 1.2 - {datetime.now().year}*
+""", unsafe_allow_html=True)
