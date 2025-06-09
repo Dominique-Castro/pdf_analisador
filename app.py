@@ -462,7 +462,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 ### 📋 Documentos Verificados
 {}
-""".format("\n".join([f"• {req}" for req in REQUISITOS])))
+""".format("\n".join([f"• {req}" for req in REQUISITOS]))
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
