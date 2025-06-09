@@ -145,7 +145,7 @@ st.markdown("""
         <h1 style="margin-bottom: 0;">Sistema de Análise Documental</h1>
         <h3 style="margin-top: 0;">Seção de Afastamentos e Acidentes - BM/RS</h3>
     </div>
-    <img class="logo-header" src="https://www.brigadamilitar.rs.gov.br/upload/recortes/202005/12153026_92567_TH.jpg">
+    <img class="logo-header" src="https://br.freepik.com/vetores-premium/arquivo-vetorial-de-tatuagem_388547181.htm#fromView=keyword&page=1&position=19&uuid=4e2e96b3-b06f-4761-9322-622c48510ba4&query=Espartano+Png">
 </div>
 """, unsafe_allow_html=True)
 
