@@ -145,7 +145,7 @@ st.markdown("""
         <h1 style="margin-bottom: 0;">Sistema de Análise Documental</h1>
         <h3 style="margin-top: 0;">Seção de Afastamentos e Acidentes - BM/RS</h3>
     </div>
-    <img class="logo-header" src="https://br.freepik.com/vetores-premium/arquivo-vetorial-de-tatuagem_388547181.htm#fromView=keyword&page=1&position=19&uuid=4e2e96b3-b06f-4761-9322-622c48510ba4&query=Espartano+Png">
+    <img class="logo-header" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/1200px-Spartan_Helmet.svg.png">
 </div>
 """, unsafe_allow_html=True)
 
@@ -449,7 +449,7 @@ if uploaded_file is not None:
         """, unsafe_allow_html=True)
 
 # Sidebar institucional
-st.sidebar.image("https://https://br.pinterest.com/pin/6614730698024787/", use_container_width=True)
+st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/1200px-Spartan_Helmet.svg.png", use_container_width=True)
 st.sidebar.markdown("""
 ### 🔍 Sobre o Sistema
 **SAA - Sistema de Análise Documental**  
@@ -468,10 +468,3 @@ st.sidebar.markdown("""
 st.sidebar.markdown("---")
 st.sidebar.markdown("""
 ### 📌 Responsável Técnico do App
-**SD BM Dominique Castro**  
-Seção de Afastamentos e Acidentes  
-📞 (51) 986371192 
-✉ dadp-saa@bm.rs.gov.br  
-
-*Versão 1.2 - {year}*  
-""".format(year=datetime.now().year), unsafe_allow_html=True)
