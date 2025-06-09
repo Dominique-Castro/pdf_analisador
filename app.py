@@ -449,7 +449,7 @@ if uploaded_file is not None:
 
 # Sidebar institucional
 st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/1200px-Spartan_Helmet.svg.png", use_container_width=True)
-st.sidebar.markdown("""
+st.sidebar.markdown(""")
 ### 🔍 Sobre o Sistema
 **SAA - Sistema de Análise Documental**  
 Ferramenta para verificação de documentos em processos administrativos, conforme:  
@@ -465,6 +465,6 @@ st.sidebar.markdown("""
 """.format("\n".join([f"• {req}" for req in REQUISITOS]))
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("""
+st.sidebar.markdown(""")
 ### 📌 Responsável Técnico do App
 **SD BM Dominique Castro**
