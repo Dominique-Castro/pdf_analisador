@@ -43,259 +43,141 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizado com tema institucional
+# CSS personalizado - Limpo, elegante, espaçamento generoso, tipografia forte e moderna
 st.markdown("""
 <style>
-    :root {
-        --verde-bm: #006341;
-        --dourado: #D4AF37;
-        --cinza-escuro: #333333;
-        --branco: #FFFFFF;
-        --bege: #F5F5DC;
-    }
-    
-    .stApp {
-        background-color: var(--bege);
-    }
-    
-    h1 {
-        color: var(--verde-bm);
-        border-bottom: 2px solid var(--dourado);
-        padding-bottom: 10px;
-        font-family: 'Calibri', sans-serif;
-    }
-    
-    h2, h3 {
-        color: var(--verde-bm);
-        font-family: 'Calibri', sans-serif;
-    }
-    
-    .st-emotion-cache-1q7spjk, .stContainer {
-        background-color: var(--branco);
-        border-radius: 8px;
-        padding: 15px;
-        border: 1px solid var(--dourado);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .stButton>button {
-        background-color: var(--verde-bm);
-        color: var(--branco);
-        border-radius: 4px;
-        font-weight: bold;
-    }
-    
-    .stButton>button:hover {
-        background-color: #004d2e;
-    }
-    
-    [data-testid="stSidebar"] {
-        background-color: var(--verde-bm);
-        color: var(--branco);
-    }
-    
-    .logo-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    
-    .logo-header {
-        height: 80px;
-    }
-    
-    @media (max-width: 768px) {
-        .logo-container {
-            flex-direction: column;
-        }
-    }
-    
-    .badge {
-        background-color: var(--verde-bm);
-        color: white;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 0.8em;
-    }
-    
-    .error-box {
-        background-color: #FFEBEE;
-        border-left: 4px solid #C62828;
-        padding: 12px;
-        border-radius: 6px;
-        margin: 8px 0;
-    }
-    
-    .info-box {
-        background-color: #E3F2FD;
-        border-left: 4px solid #1976D2;
-        padding: 12px;
-        border-radius: 6px;
-        margin: 8px 0;
-    }
+  :root {
+    --color-primary: #111827;
+    --color-accent: #006341;
+    --color-light-bg: #ffffff;
+    --color-muted-text: #6b7280;
+    --radius: 0.75rem;
+    --shadow-light: 0 2px 8px rgba(0,0,0,0.05);
+    --shadow-medium: 0 4px 16px rgba(0,0,0,0.1);
+  }
+  body, html, .stApp {
+    background-color: var(--color-light-bg);
+    color: var(--color-muted-text);
+    font-family: 'Inter', system-ui, sans-serif;
+    margin: 0;
+    padding: 0 1rem 2rem 1rem;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    background: var(--color-light-bg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0;
+    box-shadow: var(--shadow-light);
+    z-index: 99;
+  }
+  header h1 {
+    font-weight: 800;
+    font-size: 2.5rem;
+    margin: 0;
+    color: var(--color-primary);
+  }
+  .logo-img {
+    height: 50px;
+    width: auto;
+  }
+  main {
+    padding-top: 3rem;
+  }
+  section {
+    background: var(--color-light-bg);
+    box-shadow: var(--shadow-medium);
+    border-radius: var(--radius);
+    padding: 2rem;
+    margin-bottom: 3rem;
+  }
+  h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin-bottom: 1rem;
+  }
+  label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--color-primary);
+  }
+  input[type="text"], input[type="date"], .stFileUploader>div>input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    border: 1.5px solid #d1d5db;
+    font-size: 1rem;
+    margin-bottom: 1.5rem;
+    box-sizing: border-box;
+  }
+  button, .stButton>button {
+    background-color: var(--color-accent);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    font-weight: 700;
+    font-size: 1rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  button:hover, .stButton>button:hover {
+    background-color: #004d2e;
+  }
+  .badge {
+    background-color: var(--color-accent);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: inline-block;
+    margin-top: 0.25rem;
+  }
+  .error-box {
+    background-color: #fef2f2;
+    border-left: 6px solid #dc2626;
+    padding: 1rem;
+    border-radius: var(--radius);
+    color: #b91c1c;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+  }
+  .info-box {
+    background-color: #dbEafe;
+    border-left: 6px solid #2563eb;
+    padding: 1rem;
+    border-radius: var(--radius);
+    color: #1e40af;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+  }
+  iframe {
+    width: 100%;
+    height: 500px;
+    border-radius: var(--radius);
+    border: 1px solid #d4af37;
+  }
 </style>
 """, unsafe_allow_html=True)
 
-# Header institucional
+# Header com logo e título
 st.markdown("""
-<div class="logo-container">
-    <div>
-        <h1 style="margin-bottom: 0;">Sistema de Análise Documental</h1>
-        <h3 style="margin-top: 0;">Seção de Afastamentos e Acidentes - BM/RS</h3>
-    </div>
-    <img class="logo-header" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/1200px-Spartan_Helmet.svg.png">
-</div>
+<header>
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/600px-Spartan_Helmet.svg.png" alt="Logo Espartano" class="logo-img" />
+  <h1>Sistema de Análise Documental</h1>
+</header>
+<main>
 """, unsafe_allow_html=True)
 
-# Funções auxiliares para extração de dados
-def extrair_numero_processo(texto):
-    """Extrai número do processo no formato padrão da BM/RS"""
-    padroes = [
-        r"\d{4}\.\d{4}\.\d{4}-\d",  # 25/1203-0011111-0
-        r"\d{4}\.\d{3,4}\/\d{4}",    # 2023.123/2024
-        r"PAA-\d{4}\/\d{4}",          # PAA-2023/2024
-        r"PA-\d{4}\/\d{4}",           # PA-2023/2024
-    ]
-    
-    for padrao in padroes:
-        matches = re.findall(padrao, texto)
-        if matches:
-            return matches[0]
-    return None
-
-def extrair_data_acidente(texto):
-    """Extrai data do acidente no formato dd-mm-aaaa"""
-    padroes = [
-        r"Data do Acidente:?\s*(\d{2}/\d{2}/\d{4})",
-        r"Acidente ocorrido em:?\s*(\d{2}/\d{2}/\d{4})",
-        r"(\d{2}/\d{2}/\d{4}).*?(acidente|sinistro)",
-        r"(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[012])/(19|20)\d{2}"  # formato genérico
-    ]
-    
-    for padrao in padroes:
-        matches = re.search(padrao, texto, re.IGNORECASE)
-        if matches:
-            try:
-                # Verifica quantos grupos foram capturados
-                if len(matches.groups()) > 1:
-                    # Se houver grupos separados (dia, mês, ano)
-                    dia, mes, ano = matches.groups()[0], matches.groups()[1], matches.groups()[2]
-                    data_str = f"{dia}/{mes}/{ano}"
-                else:
-                    data_str = matches.group(1) if matches.groups() else matches.group(0)
-                
-                return datetime.strptime(data_str, "%d/%m/%Y").date()
-            except (ValueError, IndexError) as e:
-                logger.warning(f"Erro ao converter data: {e}")
-                continue
-    return None
-
-# Funções de processamento
-def processar_pdf(uploaded_file):
-    try:
-        uploaded_file.seek(0)
-        
-        # Converte PDF para imagens
-        imagens = convert_from_bytes(
-            uploaded_file.read(),
-            dpi=300,
-            thread_count=4,
-            fmt='jpeg'
-        )
-        
-        encontrados = {}
-        texto_por_pagina = []
-        texto_completo = ""
-
-        for i, imagem in enumerate(imagens):
-            try:
-                texto = pytesseract.image_to_string(
-                    imagem, 
-                    lang='por',
-                    config='--psm 6 --oem 3'
-                )
-                texto_por_pagina.append(texto)
-                texto_completo += texto + "\n\n"
-                
-                for requisito in REQUISITOS:
-                    if requisito.lower() in texto.lower():
-                        if requisito not in encontrados:
-                            encontrados[requisito] = []
-                        encontrados[requisito].append(i + 1)
-                        
-            except Exception as e:
-                logger.error(f"Erro ao processar página {i+1}: {str(e)}")
-                st.error(f"Erro ao processar página {i+1}")
-                continue
-
-        nao_encontrados = [r for r in REQUISITOS if r not in encontrados]
-        return encontrados, nao_encontrados, texto_completo
-        
-    except Exception as e:
-        logger.error(f"Erro grave ao processar o PDF: {str(e)}", exc_info=True)
-        st.markdown(f"""
-        <div class="error-box">
-            <b>Erro ao processar o PDF:</b><br>
-            {str(e)}<br><br>
-            Por favor, verifique se:
-            <ul>
-                <li>O arquivo não está protegido por senha</li>
-                <li>O arquivo não está corrompido</li>
-                <li>O conteúdo está legível (não são apenas imagens)</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-        return None, None, None
-
-def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_processo=None):
-    doc = Document()
-    
-    header = doc.add_paragraph()
-    header_run = header.add_run("BRIGADA MILITAR DO RIO GRANDE DO SUL\n")
-    header_run.bold = True
-    header_run.font.size = 14
-    
-    doc.add_paragraph("Seção de Afastamentos e Acidentes", style='Intense Quote')
-    
-    info_table = doc.add_table(rows=1, cols=2)
-    info_cells = info_table.rows[0].cells
-    info_cells[0].text = f"Data da análise: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
-    if numero_processo:
-        info_cells[1].text = f"Processo: {numero_processo}"
-    
-    if data_acidente:
-        doc.add_paragraph(f"Data do acidente: {data_acidente.strftime('%d/%m/%Y')}")
-    
-    doc.add_heading('Resultado da Análise Documental', level=1)
-    
-    doc.add_heading('Documentos Encontrados', level=2)
-    if encontrados:
-        for req, pags in encontrados.items():
-            doc.add_paragraph(f'{req} - Página(s): {", ".join(map(str, pags))}', style='List Bullet')
-    else:
-        doc.add_paragraph("Nenhum documento requerido foi encontrado.", style='List Bullet')
-    
-    doc.add_heading('Documentos Faltantes', level=2)
-    if nao_encontrados:
-        for req in nao_encontrados:
-            doc.add_paragraph(req, style='List Bullet')
-    else:
-        doc.add_paragraph("Todos os documentos requeridos foram encontrados.", style='List Bullet')
-    
-    doc.add_page_break()
-    doc.add_paragraph("_________________________________________")
-    doc.add_paragraph("Responsável Técnico:")
-    doc.add_paragraph("SD BM Dominique Castro")
-    doc.add_paragraph("Seção de Afastamentos e Acidentes")
-    
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
-
-# Formulário de informações
-with st.container(border=True):
+with st.container():
     st.subheader("📋 Informações do Processo")
     col1, col2 = st.columns(2)
     with col1:
@@ -303,153 +185,92 @@ with st.container(border=True):
     with col2:
         data_acidente = st.date_input("Data do Acidente:", format="DD/MM/YYYY", key="data_acidente")
 
-# Upload do documento
-with st.container(border=True):
+with st.container():
     st.subheader("📂 Documento para Análise")
-    uploaded_file = st.file_uploader("Carregue o arquivo PDF do processo", type=["pdf"], key="file_uploader")
-    
-    if uploaded_file is not None:
+    uploaded_file = st.file_uploader(
+        "Carregue o arquivo PDF do processo",
+        type=["pdf"],
+        key="file_uploader",
+        label_visibility="visible"
+    )
+    if uploaded_file:
         if uploaded_file.type != "application/pdf":
-            st.markdown("""
-            <div class="error-box">
-                Por favor, envie um arquivo PDF válido.
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown('<div class="error-box">Por favor, envie um arquivo PDF válido.</div>', unsafe_allow_html=True)
             st.stop()
-        
         if uploaded_file.size > 50 * 1024 * 1024:
-            st.markdown("""
-            <div class="error-box">
-                Arquivo muito grande. Tamanho máximo permitido: 50MB
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown('<div class="error-box">Arquivo muito grande. Tamanho máximo permitido: 50MB</div>', unsafe_allow_html=True)
             st.stop()
 
-# Processamento e resultados
-if uploaded_file is not None:
+if uploaded_file:
     try:
         with st.spinner('Analisando o documento... Isso pode levar alguns minutos para arquivos grandes...'):
-            encontrados, nao_encontrados, texto_completo = processar_pdf(uploaded_file)
-            
-            if encontrados is None or nao_encontrados is None:
-                st.markdown("""
-                <div class="error-box">
-                    Falha na análise do documento. Verifique o arquivo e tente novamente.
-                </div>
-                """, unsafe_allow_html=True)
-                st.stop()
-                
-        # Extrai e preenche automaticamente os campos
+            definidos, nao_definidos, texto_completo = processar_pdf(uploaded_file)
+        if definidos is None or nao_definidos is None:
+            st.markdown('<div class="error-box">Falha na análise do documento. Verifique o arquivo e tente novamente.</div>', unsafe_allow_html=True)
+            st.stop()
         numero_extraido = extrair_numero_processo(texto_completo)
         data_extraida = extrair_data_acidente(texto_completo)
-        
         if numero_extraido:
             st.session_state.numero_processo = numero_extraido
-            st.markdown(f"""
-            <div class="info-box">
-                Número do processo identificado: <b>{numero_extraido}</b>
-            </div>
-            """, unsafe_allow_html=True)
-        
+            st.markdown(f'<div class="info-box">Número do processo identificado: <b>{numero_extraido}</b></div>', unsafe_allow_html=True)
         if data_extraida:
             st.session_state.data_acidente = data_extraida
-            st.markdown(f"""
-            <div class="info-box">
-                Data do acidente identificada: <b>{data_extraida.strftime('%d/%m/%Y')}</b>
-            </div>
-            """, unsafe_allow_html=True)
-        
+            st.markdown(f'<div class="info-box">Data do acidente identificada: <b>{data_extraida.strftime("%d/%m/%Y")}</b></div>', unsafe_allow_html=True)
         st.success('Análise concluída com sucesso!')
-        
-        # Visualização do documento
         with st.expander("📄 Visualizar Documento", expanded=False):
             try:
                 uploaded_file.seek(0)
                 pdf_bytes = uploaded_file.read()
                 base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
-                pdf_display = f"""
-                <div style="border: 1px solid var(--dourado); border-radius: 8px; padding: 10px;">
-                    <iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500"></iframe>
-                </div>
-                """
+                pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}"></iframe>'
                 st.markdown(pdf_display, unsafe_allow_html=True)
-            except Exception as e:
-                logger.error(f"Erro ao exibir PDF: {str(e)}")
-                st.markdown(f"""
-                <div class="error-box">
-                    Não foi possível exibir o PDF. Erro: {str(e)}
-                </div>
-                """, unsafe_allow_html=True)
-
-        # Resultados da análise
+            except Exception as erro:
+                logger.error(f"Erro ao exibir PDF: {erro}")
+                st.markdown(f'<div class="error-box">Não foi possível exibir o PDF. Erro: {erro}</div>', unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["✅ Documentos Encontrados", "❌ Documentos Faltantes"])
-        
         with tab1:
-            with st.container(border=True):
-                if encontrados:
-                    st.markdown(f"**{len(encontrados)} de {len(REQUISITOS)} documentos encontrados**")
-                    progresso = len(encontrados)/len(REQUISITOS)
-                    st.progress(progresso, text=f"Completude: {progresso:.0%}")
-                    
-                    for req, pags in encontrados.items():
-                        st.markdown(f"""
-                        <div style="padding: 12px; margin: 8px 0; background-color: #E8F5E9; border-radius: 6px; border-left: 4px solid var(--verde-bm);">
-                            <b>{req}</b><br>
-                            <span class="badge">Páginas: {", ".join(map(str, pags))}</span>
-                        </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    st.markdown("""
-                    <div class="error-box">
-                        Nenhum documento requerido foi encontrado.
+            if definidos:
+                st.markdown(f'<p><strong>{len(definidos)} de {len(REQUISITOS)} documentos encontrados</strong></p>', unsafe_allow_html=True)
+                progresso = len(definidos) / len(REQUISITOS)
+                st.progress(progresso)
+                for req, pags in definidos.items():
+                    st.markdown(f'''
+                    <div style="padding:12px; margin:8px 0; background:#E8F5E9; border-radius:0.5rem; border-left: 4px solid var(--verde-bm);">
+                        <b>{req}</b><br><span class="badge">Páginas: {", ".join(map(str, pags))}</span>
                     </div>
-                    """, unsafe_allow_html=True)
-
+                    ''', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="error-box">Nenhum documento requerido foi encontrado.</div>', unsafe_allow_html=True)
         with tab2:
-            with st.container(border=True):
-                if nao_encontrados:
-                    st.markdown(f"**{len(nao_encontrados)} documentos não encontrados**")
-                    
-                    for req in nao_encontrados:
-                        st.markdown(f"""
-                        <div style="padding: 12px; margin: 8px 0; background-color: #FFEBEE; border-radius: 6px; border-left: 4px solid #C62828;">
-                            {req}
-                        </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    st.markdown("""
-                    <div class="info-box">
-                        Todos os documentos requeridos foram encontrados!
+            if nao_definidos:
+                st.markdown(f'<p><strong>{len(nao_definidos)} documentos não encontrados</strong></p>', unsafe_allow_html=True)
+                for req in nao_definidos:
+                    st.markdown(f'''
+                    <div style="padding:12px; margin:8px 0; background:#FFE4E6; border-radius:0.5rem; border-left: 4px solid #B91C1C;">
+                        {req}
                     </div>
-                    """, unsafe_allow_html=True)
-
-        # Relatórios
+                    ''', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="info-box">Todos os documentos requeridos foram encontrados!</div>', unsafe_allow_html=True)
         st.download_button(
             label="📄 Baixar Relatório Completo (DOCX)",
             data=gerar_relatorio(
-                encontrados, 
-                nao_encontrados, 
-                st.session_state.get('data_acidente'), 
-                st.session_state.get('numero_processo')
+                definidos,
+                nao_definidos,
+                data_acidente,
+                numero_processo
             ),
-            file_name=f"relatorio_{st.session_state.get('numero_processo', datetime.now().strftime('%Y%m%d'))}.docx",
+            file_name=f"relatorio_{numero_processo or datetime.now().strftime('%Y%m%d')}.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True
         )
+    except Exception as erro:
+        logger.error(f"Erro inesperado: {erro}", exc_info=True)
+        st.markdown(f'<div class="error-box"><b>Erro inesperado:</b><br>{erro}<br><br>Por favor, tente novamente. Se o problema persistir, contate o suporte técnico.</div>', unsafe_allow_html=True)
 
-    except Exception as e:
-        logger.error(f"Erro inesperado: {str(e)}", exc_info=True)
-        st.markdown(f"""
-        <div class="error-box">
-            <b>Erro inesperado:</b><br>
-            {str(e)}<br><br>
-            Por favor, tente novamente. Se o problema persistir, contate o suporte técnico.
-        </div>
-        """, unsafe_allow_html=True)
-
-# Sidebar institucional
+# Sidebar institucional moderno e minimalista
 st.sidebar.image(
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/1200px-Spartan_Helmet.svg.png",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/600px-Spartan_Helmet.svg.png",
     use_container_width=True
 )
 st.sidebar.markdown("""
@@ -460,17 +281,24 @@ Ferramenta para verificação de documentos em processos administrativos, confor
 - NI EMBM 1.26/2023  
 - Regulamento da Corporação  
 """)
+
 st.sidebar.markdown("---")
+
 st.sidebar.markdown("""
 ### 📋 Documentos Verificados
 {}
 """.format("\n".join([f"• {req}" for req in REQUISITOS])))
+
 st.sidebar.markdown("---")
+
 st.sidebar.markdown(f"""
 ### 📌 Responsável Técnico do App
 **SD BM Dominique Castro**  
 Seção de Afastamentos e Acidentes  
 📞 (51) 98637-1192  
 ✉ dadp-saa@bm.rs.gov.br  
-*Versão 1.2 - {datetime.now().year}*
+
+*Versão 1.2 - {datetime.now().year}*  
 """, unsafe_allow_html=True)
+
+st.markdown("</main>", unsafe_allow_html=True)
