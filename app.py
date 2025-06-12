@@ -297,9 +297,21 @@ with st.container(border=True):
     st.subheader("📋 Informações do Processo")
     col1, col2 = st.columns(2)
     with col1:
-        numero_processo = st.text_input("Número do Processo:", placeholder="Ex: 2023.1234.5678-9", key="numero_processo")
+        # Campo para número do processo com valor padrão da sessão
+        numero_processo = st.text_input(
+            "Número do Processo:",
+            value=st.session_state.get('numero_processo', ''),
+            placeholder="Ex: 2023.1234.5678-9",
+            key="numero_processo"
+        )
     with col2:
-        data_acidente = st.date_input("Data do Acidente:", format="DD/MM/YYYY", key="data_acidente")
+        # Campo para data do acidente com valor padrão da sessão
+        data_acidente = st.date_input(
+            "Data do Acidente:",
+            value=st.session_state.get('data_acidente'),
+            format="DD/MM/YYYY",
+            key="data_acidente"
+        )
 
 # Upload do documento
 with st.container(border=True):
@@ -348,7 +360,9 @@ if uploaded_file is not None:
                 Número do processo identificado: <b>{numero_extraido}</b>
             </div>
             """, unsafe_allow_html=True)
-        
+            # Atualiza o campo imediatamente
+            st.rerun()
+
         if data_extraida:
             st.session_state.data_acidente = data_extraida
             st.markdown(f"""
@@ -356,6 +370,8 @@ if uploaded_file is not None:
                 Data do acidente identificada: <b>{data_extraida.strftime('%d/%m/%Y')}</b>
             </div>
             """, unsafe_allow_html=True)
+            # Atualiza o campo imediatamente
+            st.rerun()
         
         st.success('Análise concluída com sucesso!')
         
