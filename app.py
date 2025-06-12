@@ -144,7 +144,7 @@ st.markdown("""
         <h1 style="margin-bottom: 0;">Sistema de Análise Documental</h1>
         <h3 style="margin-top: 0;">Seção de Afastamentos e Acidentes - BM/RS</h3>
     </div>
-    <img class="logo-header" src="https://drive.google.com/uc?export=view&id=1BYQVPvv6Cv6uwUT4_edgTE9wPnE59LaM">
+    <img class="logo-header" src="https://i.imgur.com/By8hwnl.jpeg">
 </div>
 """, unsafe_allow_html=True)
 
@@ -447,7 +447,7 @@ if uploaded_file is not None:
 
 # Sidebar institucional
 st.sidebar.image(
-    "https://drive.google.com/uc?export=view&id=1BYQVPvv6Cv6uwUT4_edgTE9wPnE59LaM",
+    "https://i.imgur.com/By8hwnl.jpeg",
     use_container_width=True
 )
 st.sidebar.markdown("""
