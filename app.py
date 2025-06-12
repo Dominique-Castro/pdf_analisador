@@ -144,7 +144,7 @@ st.markdown("""
         <h1 style="margin-bottom: 0;">Sistema de Análise Documental</h1>
         <h3 style="margin-top: 0;">Seção de Afastamentos e Acidentes - BM/RS</h3>
     </div>
-    <img class="logo-header" src=""C:\Users\bm4360087\Desktop\PDF Reader\pdf-analisador\Procfile"">
+    <img class="logo-header" src=>
 </div>
 """, unsafe_allow_html=True)
 
