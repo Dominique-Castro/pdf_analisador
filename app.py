@@ -137,14 +137,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Header institucional
+# Header institucional com novo logo
 st.markdown("""
 <div class="logo-container">
     <div>
         <h1 style="margin-bottom: 0;">Sistema de Análise Documental</h1>
         <h3 style="margin-top: 0;">Seção de Afastamentos e Acidentes - BM/RS</h3>
     </div>
-    <img class="logo-header" src=""https://github.com/Dominique-Castro/pdf_analisador/blob/main/Crie%20um%20logo%20para%20aplicativo%20de%20an%C3%A1lise%20de%20documenta%C3%A7%C3%A3o%20de%20institui%C3%A7%C3%A3o%20militar.%20(1).jpg"">
+    <img class="logo-header" src="https://drive.google.com/uc?export=view&id=1BYQVPvv6Cv6uwUT4_edgTE9wPnE59LaM">
 </div>
 """, unsafe_allow_html=True)
 
@@ -177,9 +177,7 @@ def extrair_data_acidente(texto):
         matches = re.search(padrao, texto, re.IGNORECASE)
         if matches:
             try:
-                # Verifica quantos grupos foram capturados
                 if len(matches.groups()) > 1:
-                    # Se houver grupos separados (dia, mês, ano)
                     dia, mes, ano = matches.groups()[0], matches.groups()[1], matches.groups()[2]
                     data_str = f"{dia}/{mes}/{ano}"
                 else:
@@ -449,7 +447,7 @@ if uploaded_file is not None:
 
 # Sidebar institucional
 st.sidebar.image(
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Spartan_Helmet.svg/1200px-Spartan_Helmet.svg.png",
+    "https://drive.google.com/uc?export=view&id=1BYQVPvv6Cv6uwUT4_edgTE9wPnE59LaM",
     use_container_width=True
 )
 st.sidebar.markdown("""
