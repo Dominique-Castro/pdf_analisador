@@ -144,7 +144,7 @@ st.markdown("""
         <h1 style="margin-bottom: 0;">Sistema de Análise Documental</h1>
         <h3 style="margin-top: 0;">Seção de Afastamentos e Acidentes - BM/RS</h3>
     </div>
-    <img class="logo-header" src=>
+    <img class="logo-header" src=""https://github.com/Dominique-Castro/pdf_analisador/blob/main/Crie%20um%20logo%20para%20aplicativo%20de%20an%C3%A1lise%20de%20documenta%C3%A7%C3%A3o%20de%20institui%C3%A7%C3%A3o%20militar.%20(1).jpg"">
 </div>
 """, unsafe_allow_html=True)
 
