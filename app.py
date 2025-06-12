@@ -7,6 +7,7 @@ from datetime import datetime
 import base64
 import logging
 import re
+import time  # Adicionado para o delay de atualização
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +35,12 @@ REQUISITOS = [
     "Oitiva das testemunhas", "Parecer do Encarregado",
     "Conclusão da Autoridade nomeante", "RHE", "LTS"
 ]
+
+# Inicialização das variáveis de sessão
+if 'numero_processo_ext' not in st.session_state:
+    st.session_state.numero_processo_ext = ''
+if 'data_acidente_ext' not in st.session_state:
+    st.session_state.data_acidente_ext = None
 
 # Configuração da página
 st.set_page_config(
@@ -292,26 +299,27 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
     buffer.seek(0)
     return buffer
 
-# Formulário de informações
+# Formulário de informações (ATUALIZADO)
 with st.container(border=True):
     st.subheader("📋 Informações do Processo")
     col1, col2 = st.columns(2)
     with col1:
-        # Campo para número do processo com valor padrão da sessão
         numero_processo = st.text_input(
             "Número do Processo:",
-            value=st.session_state.get('numero_processo', ''),
+            value=st.session_state.numero_processo_ext,
             placeholder="Ex: 2023.1234.5678-9",
-            key="numero_processo"
+            key="numero_processo_field"
         )
+        st.session_state.numero_processo = numero_processo  # Mantém compatibilidade
+
     with col2:
-        # Campo para data do acidente com valor padrão da sessão
         data_acidente = st.date_input(
             "Data do Acidente:",
-            value=st.session_state.get('data_acidente'),
+            value=st.session_state.data_acidente_ext,
             format="DD/MM/YYYY",
-            key="data_acidente"
+            key="data_acidente_field"
         )
+        st.session_state.data_acidente = data_acidente  # Mantém compatibilidade
 
 # Upload do documento
 with st.container(border=True):
@@ -349,29 +357,31 @@ if uploaded_file is not None:
                 """, unsafe_allow_html=True)
                 st.stop()
                 
-        # Extrai e preenche automaticamente os campos
+        # Extrai e preenche automaticamente os campos (ATUALIZADO)
         numero_extraido = extrair_numero_processo(texto_completo)
         data_extraida = extrair_data_acidente(texto_completo)
         
         if numero_extraido:
+            st.session_state.numero_processo_ext = numero_extraido
             st.session_state.numero_processo = numero_extraido
             st.markdown(f"""
             <div class="info-box">
                 Número do processo identificado: <b>{numero_extraido}</b>
             </div>
             """, unsafe_allow_html=True)
-            # Atualiza o campo imediatamente
-            st.rerun()
+            time.sleep(0.5)  # Pequeno delay para garantir a atualização
+            st.experimental_rerun()
 
         if data_extraida:
+            st.session_state.data_acidente_ext = data_extraida
             st.session_state.data_acidente = data_extraida
             st.markdown(f"""
             <div class="info-box">
                 Data do acidente identificada: <b>{data_extraida.strftime('%d/%m/%Y')}</b>
             </div>
             """, unsafe_allow_html=True)
-            # Atualiza o campo imediatamente
-            st.rerun()
+            time.sleep(0.5)  # Pequeno delay para garantir a atualização
+            st.experimental_rerun()
         
         st.success('Análise concluída com sucesso!')
         
