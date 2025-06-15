@@ -13,15 +13,6 @@ import time
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Verificação de dependências
-try:
-    from pdf2image import convert_from_bytes
-    import pytesseract
-    from docx import Document
-except ImportError as e:
-    st.error(f"Erro de dependência: {e}")
-    st.stop()
-
 # Configuração do Tesseract
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
@@ -58,6 +49,20 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Função para criar containers com borda
+def container_com_borda():
+    st.markdown("""
+    <div style="
+        border: 2px solid #006341;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+        background-color: #FFFFFF;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    ">
+    """, unsafe_allow_html=True)
+    return st.markdown("</div>", unsafe_allow_html=True)
 
 # CSS personalizado
 st.markdown("""
@@ -228,7 +233,17 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
     return buffer
 
 # Interface principal
-with st.container(border=True):
+with st.container():
+    st.markdown("""
+    <div style="
+        border: 2px solid #006341;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+        background-color: #FFFFFF;
+    ">
+    """, unsafe_allow_html=True)
+    
     st.subheader("📋 Informações do Processo")
     col1, col2 = st.columns(2)
     with col1:
@@ -243,14 +258,28 @@ with st.container(border=True):
             value=st.session_state.data_acidente_ext,
             format="DD/MM/YYYY"
         )
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
-with st.container(border=True):
+with st.container():
+    st.markdown("""
+    <div style="
+        border: 2px solid #006341;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+        background-color: #FFFFFF;
+    ">
+    """, unsafe_allow_html=True)
+    
     st.subheader("📂 Documento para Análise")
     uploaded_file = st.file_uploader(
         "Carregue o arquivo PDF do processo", 
         type=["pdf"],
         label_visibility="collapsed"
     )
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # Processamento
 if uploaded_file is not None:
