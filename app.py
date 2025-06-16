@@ -7,9 +7,16 @@ from datetime import datetime
 import base64
 import logging
 import re
-import time
+import os
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+from PIL import Image
+import numpy as np
+import cv2
+
+# Configurações globais de desempenho
+os.environ["OMP_THREAD_LIMIT"] = "1"
+os.environ["TESSDATA_PREFIX"] = "/usr/share/tesseract-ocr/4.00/tessdata"
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Configuração do Tesseract (otimizada para velocidade)
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
-TESSERACT_CONFIG = "--oem 1 --psm 6 -c preserve_interword_spaces=1"
+TESSERACT_CONFIG = "--oem 1 --psm 6 -c tessedit_do_invert=0"
 
 # Lista de requisitos com referências legais
 REQUISITOS = [
@@ -71,6 +78,9 @@ st.markdown("""
         margin: 10px 0;
         background-color: #FFFFFF;
     }
+    .stSpinner > div > div {
+        border-top-color: var(--verde-bm) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -82,7 +92,30 @@ with col1:
 with col2:
     st.image("https://i.imgur.com/By8hwnl.jpeg", width=120)
 
-# Funções de processamento otimizadas
+# Funções auxiliares otimizadas
+def pagina_vazia(img, threshold=0.95):
+    """Verifica se a página é predominantemente vazia"""
+    img_np = np.array(img.convert('L'))
+    white_pixels = np.sum(img_np > 200)
+    total_pixels = img_np.size
+    return (white_pixels / total_pixels) > threshold
+
+def preprocess_image(img):
+    """Otimiza a imagem para OCR mais rápido"""
+    img_np = np.array(img)
+    
+    if len(img_np.shape) == 3:
+        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+    
+    img_np = cv2.adaptiveThreshold(
+        img_np, 255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY, 11, 2
+    )
+    
+    img_np = cv2.medianBlur(img_np, 1)
+    return Image.fromarray(img_np)
+
 def extrair_numero_processo(texto):
     padroes = [
         r"\d{4}\.\d{4}\.\d{4}-\d",
@@ -111,32 +144,32 @@ def extrair_data_acidente(texto):
                 continue
     return None
 
-def processar_pagina(img, pagina_idx, progress_bar=None):
-    try:
-        texto = pytesseract.image_to_string(img, lang='por', config=TESSERACT_CONFIG)
-        if progress_bar:
-            progress_bar.progress((pagina_idx + 1) / progress_bar.total)
-        return texto, pagina_idx
-    except Exception as e:
-        logger.error(f"Erro página {pagina_idx}: {str(e)}")
-        return "", pagina_idx
-
-@st.cache_data(show_spinner=False)
+# Função principal de processamento otimizada
+@st.cache_data(show_spinner=False, max_entries=3, ttl=3600)
 def processar_pdf(uploaded_file, _hash, modo_rapido=False):
     try:
         # Configurações otimizadas
-        dpi = 200 if modo_rapido else 250
-        max_paginas = 5 if modo_rapido else None
+        dpi = 150 if modo_rapido else 200
+        max_paginas = 3 if modo_rapido else 10
+        thread_count = 2
         
+        # Pré-carrega o arquivo
+        file_bytes = uploaded_file.read()
+        
+        # Processamento das imagens
         imagens = convert_from_bytes(
-            uploaded_file.read(),
+            file_bytes,
             dpi=dpi,
-            thread_count=4,
+            thread_count=thread_count,
             fmt='jpeg',
             grayscale=True,
             first_page=1,
             last_page=max_paginas
         )
+        
+        # Amostragem no modo rápido
+        if modo_rapido:
+            imagens = imagens[::2]  # Pega cada segunda página
         
         encontrados = {}
         texto_por_pagina = [""] * len(imagens)
@@ -144,35 +177,33 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
         # Barra de progresso
         progress_bar = st.progress(0)
         status_text = st.empty()
-        progress_bar.total = len(imagens)
         
-        # Processamento paralelo
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = []
-            for i, img in enumerate(imagens):
-                futures.append(
-                    executor.submit(
-                        processar_pagina,
-                        img=img,
-                        pagina_idx=i,
-                        progress_bar=progress_bar
-                    )
-                )
-            
-            for future in futures:
-                texto, idx = future.result()
-                texto_por_pagina[idx] = texto
-                status_text.text(f"Processando página {idx + 1}/{len(imagens)}...")
+        # Processamento paralelo em lotes
+        with ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 2)) as executor:
+            batch_size = 2
+            for i in range(0, len(imagens), batch_size):
+                batch = imagens[i:i+batch_size]
+                results = list(executor.map(
+                    lambda img: pytesseract.image_to_string(
+                        preprocess_image(img),
+                        lang='por',
+                        config=TESSERACT_CONFIG
+                    ) if not pagina_vazia(img) else "",
+                    batch
+                ))
+                
+                for j, texto in enumerate(results):
+                    texto_por_pagina[i+j] = texto[:10000]  # Limita o tamanho
+                    progress_bar.progress((i+j+1) / len(imagens))
+                    status_text.text(f"Processando página {i+j+1}/{len(imagens)}...")
         
         texto_completo = "\n\n".join(texto_por_pagina)
         
-        # Análise dos requisitos
-        for i, texto in enumerate(texto_por_pagina):
-            for doc, artigo in REQUISITOS:
-                if doc.lower() in texto.lower():
-                    if doc not in encontrados:
-                        encontrados[doc] = {"paginas": [], "artigo": artigo}
-                    encontrados[doc]["paginas"].append(i + 1)
+        # Análise otimizada dos requisitos
+        texto_min = texto_completo.lower()
+        for doc, artigo in REQUISITOS:
+            if doc.lower() in texto_min:
+                encontrados[doc] = {"artigo": artigo}
         
         nao_encontrados = [doc for doc, _ in REQUISITOS if doc not in encontrados]
         
@@ -214,7 +245,7 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
     if encontrados:
         for doc_name, info in encontrados.items():
             doc.add_paragraph(
-                f'{doc_name} (Art. {info["artigo"]}) - Páginas: {", ".join(map(str, info["paginas"]))}',
+                f'{doc_name} (Art. {info["artigo"]})',
                 style='List Bullet'
             )
     else:
@@ -233,7 +264,7 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
     doc.add_page_break()
     doc.add_paragraph("_________________________________________")
     doc.add_paragraph("Responsável Técnico:")
-    doc.add_paragraph("SD BM Dominique Castro")
+    doc.add_paragraph("SD PM Dominique Castro")
     
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -241,140 +272,171 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
     return buffer
 
 # Interface principal
-with st.container():
-    st.markdown('<div class="container-bordered">', unsafe_allow_html=True)
-    
-    st.subheader("📋 Informações do Processo")
-    col1, col2 = st.columns(2)
-    with col1:
-        numero_processo = st.text_input(
-            "Número do Processo:",
-            placeholder="Ex: 2023.1234.5678-9"
-        )
-    with col2:
-        data_acidente = st.date_input(
-            "Data do Acidente:",
-            format="DD/MM/YYYY"
-        )
-    
-    st.markdown("</div>", unsafe_allow_html=True)
+def main():
+    # Inicialização do estado da sessão
+    if 'analise_iniciada' not in st.session_state:
+        st.session_state.analise_iniciada = False
+    if 'resultados' not in st.session_state:
+        st.session_state.resultados = None
 
-with st.container():
-    st.markdown('<div class="container-bordered">', unsafe_allow_html=True)
-    
-    st.subheader("📂 Documento para Análise")
-    modo_rapido = st.toggle("Modo rápido (análise parcial)", help="Analisa apenas as primeiras 5 páginas com configurações otimizadas")
-    uploaded_file = st.file_uploader(
-        "Carregue o arquivo PDF do processo", 
-        type=["pdf"],
-        label_visibility="collapsed"
-    )
-    
-    st.markdown("</div>", unsafe_allow_html=True)
+    # Seção de informações do processo
+    with st.container():
+        st.markdown('<div class="container-bordered">', unsafe_allow_html=True)
+        st.subheader("📋 Informações do Processo")
+        col1, col2 = st.columns(2)
+        with col1:
+            numero_processo = st.text_input(
+                "Número do Processo:",
+                placeholder="Ex: 2023.1234.5678-9",
+                key="numero_processo_input"
+            )
+        with col2:
+            data_acidente = st.date_input(
+                "Data do Acidente:",
+                format="DD/MM/YYYY",
+                key="data_acidente_input"
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-# Processamento
-if uploaded_file is not None:
-    file_hash = hashlib.md5(uploaded_file.getvalue()).hexdigest()
-    
-    with st.spinner('Otimizando análise...'):
-        encontrados, nao_encontrados, texto_completo = processar_pdf(
-            uploaded_file, 
-            _hash=file_hash,
-            modo_rapido=modo_rapido
+    # Seção de upload de documento
+    with st.container():
+        st.markdown('<div class="container-bordered">', unsafe_allow_html=True)
+        st.subheader("📂 Documento para Análise")
+        modo_rapido = st.toggle(
+            "Modo rápido (análise parcial)", 
+            help="Analisa apenas páginas selecionadas com configurações otimizadas",
+            value=True,
+            key="modo_rapido_toggle"
         )
         
-        if encontrados is not None:
-            # Atualiza campos automaticamente
-            numero_extraido = extrair_numero_processo(texto_completo)
-            data_extraida = extrair_data_acidente(texto_completo)
+        uploaded_file = st.file_uploader(
+            "Carregue o arquivo PDF do processo", 
+            type=["pdf"],
+            label_visibility="collapsed",
+            disabled=st.session_state.analise_iniciada,
+            key="file_uploader"
+        )
+        
+        if uploaded_file and not st.session_state.analise_iniciada:
+            st.session_state.analise_iniciada = True
+            st.rerun()
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # Processamento do documento
+    if uploaded_file is not None and st.session_state.analise_iniciada:
+        file_hash = hashlib.md5(uploaded_file.getvalue()).hexdigest()
+        
+        with st.spinner('Otimizando análise...'):
+            encontrados, nao_encontrados, texto_completo = processar_pdf(
+                uploaded_file, 
+                _hash=file_hash,
+                modo_rapido=modo_rapido
+            )
             
-            if numero_extraido:
-                st.session_state.numero_processo_ext = numero_extraido
-            if data_extraida:
-                st.session_state.data_acidente_ext = data_extraida
-            
-            st.session_state.resultados = {
-                "encontrados": encontrados,
-                "nao_encontrados": nao_encontrados,
-                "texto": texto_completo,
-                "modo_rapido": modo_rapido
-            }
-            
-            st.success("Análise concluída com sucesso!")
+            if encontrados is not None:
+                # Atualiza campos automaticamente
+                numero_extraido = extrair_numero_processo(texto_completo)
+                data_extraida = extrair_data_acidente(texto_completo)
+                
+                if numero_extraido:
+                    st.session_state.numero_processo_ext = numero_extraido
+                if data_extraida:
+                    st.session_state.data_acidente_ext = data_extraida
+                
+                st.session_state.resultados = {
+                    "encontrados": encontrados,
+                    "nao_encontrados": nao_encontrados,
+                    "texto": texto_completo,
+                    "modo_rapido": modo_rapido
+                }
+                
+                st.success("Análise concluída com sucesso!")
+                st.session_state.analise_iniciada = False
+                st.rerun()
+
+    # Exibição de resultados
+    if st.session_state.get('resultados'):
+        resultados = st.session_state.resultados
+        
+        if resultados["modo_rapido"]:
+            st.warning("Modo rápido ativado - análise parcial realizada")
+
+        # Botão para limpar cache
+        if st.button("🔄 Limpar Cache e Reiniciar Análise"):
+            st.cache_data.clear()
+            st.session_state.clear()
             st.rerun()
 
-# Exibição de resultados
-if "resultados" in st.session_state:
-    if st.session_state.resultados["modo_rapido"]:
-        st.warning("Modo rápido ativado - análise limitada às primeiras 5 páginas")
+        tab1, tab2 = st.tabs(["✅ Documentos Encontrados", "❌ Documentos Faltantes"])
+        
+        with tab1:
+            if resultados["encontrados"]:
+                progresso = len(resultados["encontrados"]) / len(REQUISITOS)
+                st.metric("Completude Documental", value=f"{progresso:.0%}")
+                
+                for doc, info in resultados["encontrados"].items():
+                    st.markdown(f"""
+                    <div style="padding:10px;margin:5px;background:#E8F5E9;border-radius:5px;">
+                    <b>{doc}</b> <span class='badge-legal'>Art. {info['artigo']}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.warning("Nenhum documento encontrado")
 
-    tab1, tab2 = st.tabs(["✅ Documentos Encontrados", "❌ Documentos Faltantes"])
-    
-    with tab1:
-        if st.session_state.resultados["encontrados"]:
-            progresso = len(st.session_state.resultados["encontrados"]) / len(REQUISITOS)
-            st.metric("Completude Documental", value=f"{progresso:.0%}")
-            
-            for doc, info in st.session_state.resultados["encontrados"].items():
-                st.markdown(f"""
-                <div style="padding:10px;margin:5px;background:#E8F5E9;border-radius:5px;">
-                <b>{doc}</b> <span class='badge-legal'>Art. {info['artigo']}</span><br>
-                Páginas: {", ".join(map(str, info["paginas"]))}
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.warning("Nenhum documento encontrado")
+        with tab2:
+            if resultados["nao_encontrados"]:
+                for doc in resultados["nao_encontrados"]:
+                    artigo = next(artigo for d, artigo in REQUISITOS if d == doc)
+                    st.markdown(f"""
+                    <div style="padding:10px;margin:5px;background:#FFEBEE;border-radius:5px;">
+                    ❌ <b>{doc}</b> <span class='badge-legal'>Art. {artigo}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.success("Todos os documentos foram encontrados!")
 
-    with tab2:
-        if st.session_state.resultados["nao_encontrados"]:
-            for doc in st.session_state.resultados["nao_encontrados"]:
-                artigo = next(artigo for d, artigo in REQUISITOS if d == doc)
-                st.markdown(f"""
-                <div style="padding:10px;margin:5px;background:#FFEBEE;border-radius:5px;">
-                ❌ <b>{doc}</b> <span class='badge-legal'>Art. {artigo}</span>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.success("Todos os documentos foram encontrados!")
+        # Visualização do documento
+        with st.expander("📄 Visualizar Documento", expanded=False):
+            try:
+                uploaded_file.seek(0)
+                base64_pdf = base64.b64encode(uploaded_file.read()).decode('utf-8')
+                st.markdown(
+                    f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500"></iframe>',
+                    unsafe_allow_html=True
+                )
+            except Exception as e:
+                st.error(f"Erro ao exibir PDF: {str(e)}")
 
-    # Visualização do documento
-    with st.expander("📄 Visualizar Documento", expanded=False):
-        try:
-            uploaded_file.seek(0)
-            base64_pdf = base64.b64encode(uploaded_file.read()).decode('utf-8')
-            st.markdown(
-                f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500"></iframe>',
-                unsafe_allow_html=True
-            )
-        except Exception as e:
-            st.error(f"Erro ao exibir PDF: {str(e)}")
+        # Relatório
+        st.download_button(
+            label="📄 Baixar Relatório Completo",
+            data=gerar_relatorio(
+                resultados["encontrados"],
+                resultados["nao_encontrados"],
+                st.session_state.get('data_acidente_ext'),
+                st.session_state.get('numero_processo_ext')
+            ),
+            file_name=f"relatorio_{st.session_state.get('numero_processo_ext', datetime.now().strftime('%Y%m%d'))}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
-    # Relatório
-    st.download_button(
-        label="📄 Baixar Relatório Completo",
-        data=gerar_relatorio(
-            st.session_state.resultados["encontrados"],
-            st.session_state.resultados["nao_encontrados"],
-            st.session_state.get('data_acidente_ext'),
-            st.session_state.get('numero_processo_ext')
-        ),
-        file_name=f"relatorio_{st.session_state.get('numero_processo_ext', datetime.now().strftime('%Y%m%d'))}.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+    # Sidebar institucional
+    with st.sidebar:
+        st.image("https://i.imgur.com/By8hwnl.jpeg", use_column_width=True)
+        st.markdown("""
+        ### 🔍 Normativos de Referência
+        - Decreto nº 32.280/1986
+        - NI EMBM 1.26/2023
+        - Regulamento Disciplinar (RDBM)
+        """)
+        st.markdown("---")
+        st.markdown(f"""
+        ### 📌 Responsável Técnico
+        **SD PM Dominique Castro**  
+        Seção de Afastamentos e Acidentes  
+        *Versão 3.1 - {datetime.now().year}*
+        """)
 
-# Sidebar institucional
-with st.sidebar:
-    st.image("https://i.imgur.com/By8hwnl.jpeg", use_column_width=True)
-    st.markdown("""
-    ### 🔍 Normativos de Referência
-    - Decreto nº 32.280/1986
-    - NI EMBM 1.26/2023
-    - Regulamento Disciplinar (RDBM)
-    """)
-    st.markdown("---")
-    st.markdown(f"""
-    ### 📌 Responsável Técnico
-    **SD BM Dominique Castro**  
-    Seção de Afastamentos e Acidentes  
-    *Versão 3.0 - {datetime.now().year}*
-    """)
+if __name__ == "__main__":
+    main()
