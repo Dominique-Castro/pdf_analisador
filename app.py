@@ -380,7 +380,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(f"""
     ### 📌 Responsável Técnico
-    **SD BM Dominique Castro**  
+    **SD PM Dominique Castro**  
     Seção de Afastamentos e Acidentes  
     *Versão 2.1 - {datetime.now().year}*
     """)
