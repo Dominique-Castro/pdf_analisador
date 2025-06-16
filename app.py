@@ -12,7 +12,14 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 from PIL import Image
 import numpy as np
-import cv2
+
+# Verifica e importa OpenCV com fallback
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+    st.warning("OpenCV não está instalado. Algumas otimizações de imagem serão desativadas.")
 
 # Configurações globais de desempenho
 os.environ["OMP_THREAD_LIMIT"] = "1"
@@ -104,16 +111,13 @@ def preprocess_image(img):
     """Otimiza a imagem para OCR mais rápido"""
     img_np = np.array(img)
     
+    # Converte para escala de cinza se necessário
     if len(img_np.shape) == 3:
-        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+        img_np = np.dot(img_np[...,:3], [0.2989, 0.5870, 0.1140])  # RGB para grayscale
     
-    img_np = cv2.adaptiveThreshold(
-        img_np, 255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY, 11, 2
-    )
+    # Binarização simples (fallback sem OpenCV)
+    img_np = (img_np > 128).astype(np.uint8) * 255
     
-    img_np = cv2.medianBlur(img_np, 1)
     return Image.fromarray(img_np)
 
 def extrair_numero_processo(texto):
@@ -179,7 +183,7 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
         status_text = st.empty()
         
         # Processamento paralelo em lotes
-        with ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 2)) as executor:
+        with ThreadPoolExecutor(max_workers=min(4, (os.cpu_count() or 2))) as executor:
             batch_size = 2
             for i in range(0, len(imagens), batch_size):
                 batch = imagens[i:i+batch_size]
@@ -435,7 +439,7 @@ def main():
         ### 📌 Responsável Técnico
         **SD PM Dominique Castro**  
         Seção de Afastamentos e Acidentes  
-        *Versão 3.1 - {datetime.now().year}*
+        *Versão 3.2 - {datetime.now().year}*
         """)
 
 if __name__ == "__main__":
