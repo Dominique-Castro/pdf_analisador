@@ -1,4 +1,13 @@
 import streamlit as st
+
+# Configuração da página (DEVE SER O PRIMEIRO COMANDO STREAMLIT)
+st.set_page_config(
+    page_title="Sistema de Análise Documental - BM/RS",
+    page_icon="🛡️",
+    layout="wide"
+)
+
+# Imports restantes
 from pdf2image import convert_from_bytes
 import pytesseract
 from docx import Document
@@ -13,7 +22,7 @@ import hashlib
 from PIL import Image
 import numpy as np
 
-# Verifica e importa OpenCV com fallback
+# Verificação do OpenCV
 try:
     import cv2
     CV2_AVAILABLE = True
@@ -21,7 +30,7 @@ except ImportError:
     CV2_AVAILABLE = False
     st.warning("OpenCV não está instalado. Algumas otimizações de imagem serão desativadas.")
 
-# Configurações globais de desempenho
+# Configurações globais
 os.environ["OMP_THREAD_LIMIT"] = "1"
 os.environ["TESSDATA_PREFIX"] = "/usr/share/tesseract-ocr/4.00/tessdata"
 
@@ -29,7 +38,7 @@ os.environ["TESSDATA_PREFIX"] = "/usr/share/tesseract-ocr/4.00/tessdata"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuração do Tesseract (otimizada para velocidade)
+# Configuração do Tesseract
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 TESSERACT_CONFIG = "--oem 1 --psm 6 -c tessedit_do_invert=0"
 
@@ -53,14 +62,7 @@ REQUISITOS = [
     ("LTS", "Portaria 095/SSP/15")
 ]
 
-# Configuração da página
-st.set_page_config(
-    page_title="Sistema de Análise Documental - BM/RS",
-    page_icon="🛡️",
-    layout="wide"
-)
-
-# CSS personalizado otimizado
+# CSS personalizado
 st.markdown("""
 <style>
     :root {
@@ -99,7 +101,7 @@ with col1:
 with col2:
     st.image("https://i.imgur.com/By8hwnl.jpeg", width=120)
 
-# Funções auxiliares otimizadas
+# Funções auxiliares
 def pagina_vazia(img, threshold=0.95):
     """Verifica se a página é predominantemente vazia"""
     img_np = np.array(img.convert('L'))
@@ -108,15 +110,20 @@ def pagina_vazia(img, threshold=0.95):
     return (white_pixels / total_pixels) > threshold
 
 def preprocess_image(img):
-    """Otimiza a imagem para OCR mais rápido"""
+    """Otimiza a imagem para OCR"""
     img_np = np.array(img)
     
-    # Converte para escala de cinza se necessário
-    if len(img_np.shape) == 3:
-        img_np = np.dot(img_np[...,:3], [0.2989, 0.5870, 0.1140])  # RGB para grayscale
-    
-    # Binarização simples (fallback sem OpenCV)
-    img_np = (img_np > 128).astype(np.uint8) * 255
+    if CV2_AVAILABLE:
+        if len(img_np.shape) == 3:
+            img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+        img_np = cv2.adaptiveThreshold(
+            img_np, 255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY, 11, 2)
+    else:
+        if len(img_np.shape) == 3:
+            img_np = np.dot(img_np[...,:3], [0.2989, 0.5870, 0.1140])
+        img_np = (img_np > 128).astype(np.uint8) * 255
     
     return Image.fromarray(img_np)
 
@@ -148,19 +155,14 @@ def extrair_data_acidente(texto):
                 continue
     return None
 
-# Função principal de processamento otimizada
 @st.cache_data(show_spinner=False, max_entries=3, ttl=3600)
 def processar_pdf(uploaded_file, _hash, modo_rapido=False):
     try:
-        # Configurações otimizadas
         dpi = 150 if modo_rapido else 200
         max_paginas = 3 if modo_rapido else 10
         thread_count = 2
         
-        # Pré-carrega o arquivo
         file_bytes = uploaded_file.read()
-        
-        # Processamento das imagens
         imagens = convert_from_bytes(
             file_bytes,
             dpi=dpi,
@@ -171,18 +173,15 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
             last_page=max_paginas
         )
         
-        # Amostragem no modo rápido
         if modo_rapido:
-            imagens = imagens[::2]  # Pega cada segunda página
+            imagens = imagens[::2]
         
         encontrados = {}
         texto_por_pagina = [""] * len(imagens)
         
-        # Barra de progresso
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        # Processamento paralelo em lotes
         with ThreadPoolExecutor(max_workers=min(4, (os.cpu_count() or 2))) as executor:
             batch_size = 2
             for i in range(0, len(imagens), batch_size):
@@ -197,14 +196,13 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
                 ))
                 
                 for j, texto in enumerate(results):
-                    texto_por_pagina[i+j] = texto[:10000]  # Limita o tamanho
+                    texto_por_pagina[i+j] = texto[:10000]
                     progress_bar.progress((i+j+1) / len(imagens))
                     status_text.text(f"Processando página {i+j+1}/{len(imagens)}...")
         
         texto_completo = "\n\n".join(texto_por_pagina)
-        
-        # Análise otimizada dos requisitos
         texto_min = texto_completo.lower()
+        
         for doc, artigo in REQUISITOS:
             if doc.lower() in texto_min:
                 encontrados[doc] = {"artigo": artigo}
@@ -224,7 +222,6 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
 def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_processo=None):
     doc = Document()
     
-    # Cabeçalho
     header = doc.add_paragraph()
     header_run = header.add_run("BRIGADA MILITAR DO RIO GRANDE DO SUL\n")
     header_run.bold = True
@@ -232,7 +229,6 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
     
     doc.add_paragraph("Seção de Afastamentos e Acidentes", style='Intense Quote')
     
-    # Metadados
     info_table = doc.add_table(rows=1, cols=2)
     info_cells = info_table.rows[0].cells
     info_cells[0].text = f"Data da análise: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
@@ -242,7 +238,6 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
     if data_acidente:
         doc.add_paragraph(f"Data do acidente: {data_acidente.strftime('%d/%m/%Y')}")
     
-    # Conteúdo
     doc.add_heading('Resultado da Análise Documental', level=1)
     
     doc.add_heading('Documentos Encontrados', level=2)
@@ -264,7 +259,6 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
                 style='List Bullet'
             )
     
-    # Rodapé
     doc.add_page_break()
     doc.add_paragraph("_________________________________________")
     doc.add_paragraph("Responsável Técnico:")
@@ -277,13 +271,11 @@ def gerar_relatorio(encontrados, nao_encontrados, data_acidente=None, numero_pro
 
 # Interface principal
 def main():
-    # Inicialização do estado da sessão
     if 'analise_iniciada' not in st.session_state:
         st.session_state.analise_iniciada = False
     if 'resultados' not in st.session_state:
         st.session_state.resultados = None
 
-    # Seção de informações do processo
     with st.container():
         st.markdown('<div class="container-bordered">', unsafe_allow_html=True)
         st.subheader("📋 Informações do Processo")
@@ -302,7 +294,6 @@ def main():
             )
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Seção de upload de documento
     with st.container():
         st.markdown('<div class="container-bordered">', unsafe_allow_html=True)
         st.subheader("📂 Documento para Análise")
@@ -327,7 +318,6 @@ def main():
         
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Processamento do documento
     if uploaded_file is not None and st.session_state.analise_iniciada:
         file_hash = hashlib.md5(uploaded_file.getvalue()).hexdigest()
         
@@ -339,7 +329,6 @@ def main():
             )
             
             if encontrados is not None:
-                # Atualiza campos automaticamente
                 numero_extraido = extrair_numero_processo(texto_completo)
                 data_extraida = extrair_data_acidente(texto_completo)
                 
@@ -359,14 +348,12 @@ def main():
                 st.session_state.analise_iniciada = False
                 st.rerun()
 
-    # Exibição de resultados
     if st.session_state.get('resultados'):
         resultados = st.session_state.resultados
         
         if resultados["modo_rapido"]:
             st.warning("Modo rápido ativado - análise parcial realizada")
 
-        # Botão para limpar cache
         if st.button("🔄 Limpar Cache e Reiniciar Análise"):
             st.cache_data.clear()
             st.session_state.clear()
@@ -400,7 +387,6 @@ def main():
             else:
                 st.success("Todos os documentos foram encontrados!")
 
-        # Visualização do documento
         with st.expander("📄 Visualizar Documento", expanded=False):
             try:
                 uploaded_file.seek(0)
@@ -412,7 +398,6 @@ def main():
             except Exception as e:
                 st.error(f"Erro ao exibir PDF: {str(e)}")
 
-        # Relatório
         st.download_button(
             label="📄 Baixar Relatório Completo",
             data=gerar_relatorio(
