@@ -66,6 +66,10 @@ st.markdown(f"""
     .stAlert {{
         border-left: 4px solid var(--vermelho-militar);
     }}
+    .pdf-viewer {{
+        border: 2px solid var(--verde-bm);
+        border-radius: 8px;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -80,6 +84,10 @@ except ImportError:
 # Configuração do Tesseract
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 TESSERACT_CONFIG = "--oem 1 --psm 6"
+
+# Configuração de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ========== LISTA DE REQUISITOS ========== #
 REQUISITOS = [
@@ -128,7 +136,7 @@ def preprocess_image(img):
         
         return Image.fromarray(img_np)
     except Exception as e:
-        logging.error(f"Erro no pré-processamento: {str(e)}")
+        logger.error(f"Erro no pré-processamento: {str(e)}")
         return img
 
 def extrair_numero_processo(texto):
@@ -164,7 +172,7 @@ def extrair_data_acidente(texto):
 
 @st.cache_data(show_spinner=False, max_entries=3, ttl=3600)
 def processar_pdf(uploaded_file, _hash, modo_rapido=False):
-    """Processa o PDF e retorna documentos encontrados"""
+    """Processa o PDF e retorna documentos encontrados com referência de páginas"""
     try:
         # Reset do ponteiro do arquivo
         uploaded_file.seek(0)
@@ -172,7 +180,7 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
         
         # Configurações de processamento
         dpi = 150 if modo_rapido else 200
-        max_paginas = 3 if modo_rapido else 5
+        max_paginas = 3 if modo_rapido else 10
         
         # Barra de progresso
         progress_bar = st.progress(0)
@@ -194,6 +202,7 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
         # Processamento das páginas
         encontrados = {}
         texto_completo = ""
+        pdf_pages = []  # Armazena os bytes de cada página para visualização
         
         for i, img in enumerate(imagens):
             progresso = 20 + int(70 * (i / len(imagens)))
@@ -207,12 +216,23 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
                     lang='por',
                     config=TESSERACT_CONFIG
                 )
-                texto_completo += "\n\n" + texto
+                texto_completo += f"\n\n--- PÁGINA {i+1} ---\n{texto}"
+                
+                # Armazena a imagem da página para visualização
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format='JPEG')
+                pdf_pages.append(img_byte_arr.getvalue())
                 
                 # Verifica cada requisito no texto
                 for doc, artigo in REQUISITOS:
                     if re.search(re.escape(doc.lower()), texto.lower()):
-                        encontrados[doc] = {"artigo": artigo}
+                        if doc not in encontrados:
+                            encontrados[doc] = {
+                                "artigo": artigo,
+                                "paginas": [i+1]
+                            }
+                        else:
+                            encontrados[doc]["paginas"].append(i+1)
         
         progress_bar.progress(95)
         nao_encontrados = [doc for doc, _ in REQUISITOS if doc not in encontrados]
@@ -227,11 +247,13 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
             "nao_encontrados": nao_encontrados,
             "texto": texto_completo,
             "numero_processo": numero_processo,
-            "data_acidente": data_acidente
+            "data_acidente": data_acidente,
+            "pdf_pages": pdf_pages,
+            "total_pages": len(imagens)
         }
         
     except Exception as e:
-        logging.error(f"Erro no processamento: {str(e)}")
+        logger.error(f"Erro no processamento: {str(e)}")
         st.error(f"Erro durante a análise: {str(e)}")
         return None
     finally:
@@ -239,7 +261,7 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
         if 'status_text' in locals(): status_text.empty()
 
 def gerar_relatorio(resultados):
-    """Gera relatório em DOCX com formatação profissional"""
+    """Gera relatório em DOCX com referência de páginas"""
     try:
         doc = Document()
         
@@ -257,6 +279,7 @@ def gerar_relatorio(resultados):
             doc.add_paragraph(f"Número do processo: {resultados['numero_processo']}")
         if resultados.get('data_acidente'):
             doc.add_paragraph(f"Data do acidente: {resultados['data_acidente'].strftime('%d/%m/%Y')}")
+        doc.add_paragraph(f"Total de páginas analisadas: {resultados.get('total_pages', 'N/A')}")
         
         doc.add_paragraph()
         
@@ -264,7 +287,11 @@ def gerar_relatorio(resultados):
         doc.add_heading('DOCUMENTOS ENCONTRADOS', level=1)
         if resultados['encontrados']:
             for doc_name, info in resultados['encontrados'].items():
-                doc.add_paragraph(f"✓ {doc_name} (Art. {info['artigo']})", style='List Bullet')
+                paginas = ", ".join(map(str, info['paginas']))
+                doc.add_paragraph(
+                    f"✓ {doc_name} (Art. {info['artigo']}) - Páginas: {paginas}",
+                    style='List Bullet'
+                )
         else:
             doc.add_paragraph("Nenhum documento encontrado", style='List Bullet')
         
@@ -293,9 +320,40 @@ def gerar_relatorio(resultados):
         return buffer
         
     except Exception as e:
-        logging.error(f"Erro ao gerar relatório: {str(e)}")
+        logger.error(f"Erro ao gerar relatório: {str(e)}")
         st.error("Erro ao gerar relatório")
         return None
+
+def mostrar_pdf(pdf_pages):
+    """Exibe visualizador de PDF com navegação por páginas"""
+    try:
+        if not pdf_pages:
+            st.warning("Nenhuma página disponível para visualização")
+            return
+            
+        st.markdown("### Visualizador de Documento")
+        
+        # Controle de páginas
+        col1, col2, _ = st.columns([1, 1, 3])
+        with col1:
+            page_num = st.number_input(
+                "Página:",
+                min_value=1,
+                max_value=len(pdf_pages),
+                value=1,
+                step=1
+            )
+        
+        # Exibe a página selecionada
+        st.image(
+            pdf_pages[page_num-1],
+            caption=f"Página {page_num} de {len(pdf_pages)}",
+            use_column_width=True
+        )
+        
+    except Exception as e:
+        logger.error(f"Erro ao exibir PDF: {str(e)}")
+        st.error("Erro ao carregar visualizador de documento")
 
 # ========== INTERFACE PRINCIPAL ========== #
 def main():
@@ -387,9 +445,11 @@ def main():
                         st.metric("Completude Documental", f"{progresso:.0%}")
                         
                         for doc, info in resultados['encontrados'].items():
+                            paginas = ", ".join(map(str, info['paginas']))
                             st.markdown(f"""
                             <div style="padding:10px;margin:5px;background:#E8F5E9;border-radius:5px;">
                             <b>{doc}</b> <span class='badge-legal'>Art. {info['artigo']}</span>
+                            <div style="font-size:0.9em;margin-top:5px;">Páginas: {paginas}</div>
                             </div>
                             """, unsafe_allow_html=True)
                     else:
@@ -408,16 +468,8 @@ def main():
                         st.success("Todos os documentos foram encontrados!")
 
                 # Visualização do documento
-                with st.expander("📄 Visualizar Documento", expanded=False):
-                    try:
-                        uploaded_file.seek(0)
-                        base64_pdf = base64.b64encode(uploaded_file.read()).decode('utf-8')
-                        st.markdown(
-                            f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500"></iframe>',
-                            unsafe_allow_html=True
-                        )
-                    except Exception as e:
-                        st.error(f"Erro ao exibir PDF: {str(e)}")
+                with st.expander("📄 Visualizador de Documento", expanded=False):
+                    mostrar_pdf(resultados.get('pdf_pages', []))
 
                 # Geração do relatório
                 relatorio = gerar_relatorio(resultados)
@@ -426,9 +478,9 @@ def main():
                         label="📄 Baixar Relatório Completo",
                         data=relatorio,
                         file_name=f"relatorio_{numero_processo or datetime.now().strftime('%Y%m%d')}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        key="download_relatorio"
                     )
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     main()
