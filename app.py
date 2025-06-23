@@ -19,6 +19,19 @@ st.set_page_config(
     layout="wide"
 )
 
+# ========== VERIFICAÇÃO DE DEPENDÊNCIAS ========== #
+try:
+    import cv2
+    CV2_AVAILABLE = True
+    st.success(f"✅ OpenCV {cv2.__version__} instalado!")
+except ImportError:
+    CV2_AVAILABLE = False
+    st.error("""
+    ❌ OpenCV não está instalado!
+    Algumas otimizações de imagem estarão desativadas.
+    Adicione 'opencv-python-headless' ao requirements.txt
+    """)
+
 # ========== PALETA DE CORES MILITARES ========== #
 primary_color = "#006341"  # Verde BM
 secondary_color = "#D4AF37"  # Dourado
@@ -70,20 +83,23 @@ st.markdown(f"""
         border: 2px solid var(--verde-bm);
         border-radius: 8px;
     }}
+    .ocr-warning {{
+        background-color: #FFF3E0;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
 # ========== CONFIGURAÇÕES TÉCNICAS ========== #
+# Configuração do Tesseract (com fallback)
 try:
-    import cv2
-    CV2_AVAILABLE = True
-except ImportError:
-    CV2_AVAILABLE = False
-    st.sidebar.warning("OpenCV não instalado - algumas otimizações desativadas")
-
-# Configuração do Tesseract
-pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
-TESSERACT_CONFIG = "--oem 1 --psm 6"
+    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+    TESSERACT_CONFIG = "--oem 1 --psm 6"
+except Exception as e:
+    st.error(f"Erro na configuração do Tesseract: {str(e)}")
+    TESSERACT_CONFIG = ""
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -111,18 +127,29 @@ REQUISITOS = [
 
 # ========== FUNÇÕES AUXILIARES ========== #
 def pagina_vazia(img, threshold=0.95):
-    """Verifica se a página é predominantemente vazia"""
-    img_np = np.array(img.convert('L'))
-    white_pixels = np.sum(img_np > 200)
-    total_pixels = img_np.size
-    return (white_pixels / total_pixels) > threshold
+    """Verifica se a página é predominantemente vazia com otimização"""
+    try:
+        # Converte para escala de cinza se necessário
+        if img.mode != 'L':
+            img = img.convert('L')
+        
+        # Usa numpy para cálculo eficiente
+        img_array = np.array(img)
+        white_pixels = np.sum(img_array > 200)
+        total_pixels = img_array.size
+        
+        return (white_pixels / total_pixels) > threshold
+    except Exception as e:
+        logger.error(f"Erro ao verificar página vazia: {str(e)}")
+        return False
 
 def preprocess_image(img):
-    """Processamento otimizado da imagem para OCR"""
+    """Processamento otimizado da imagem para OCR com fallback"""
     try:
         img_np = np.array(img)
         
         if CV2_AVAILABLE:
+            # Processamento com OpenCV (mais eficiente)
             if len(img_np.shape) == 3:
                 img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
             img_np = cv2.adaptiveThreshold(
@@ -130,6 +157,7 @@ def preprocess_image(img):
                 cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                 cv2.THRESH_BINARY, 11, 2)
         else:
+            # Fallback sem OpenCV
             if len(img_np.shape) == 3:
                 img_np = np.dot(img_np[...,:3], [0.2989, 0.5870, 0.1140])
             img_np = (img_np > 128).astype(np.uint8) * 255
@@ -137,48 +165,58 @@ def preprocess_image(img):
         return Image.fromarray(img_np)
     except Exception as e:
         logger.error(f"Erro no pré-processamento: {str(e)}")
-        return img
+        return img  # Retorna a imagem original em caso de erro
 
 def extrair_numero_processo(texto):
-    """Extrai número do processo usando regex"""
-    padroes = [
-        r"\d{4}\.\d{4}\.\d{4}-\d",
-        r"\d{4}\.\d{3,4}\/\d{4}",
-        r"PAA-\d{4}\/\d{4}",
-        r"PA-\d{4}\/\d{4}"
-    ]
-    for padrao in padroes:
-        matches = re.findall(padrao, texto)
-        if matches: 
-            return matches[0]
-    return None
+    """Extrai número do processo usando regex otimizado"""
+    try:
+        padroes = [
+            r"\d{4}\.\d{4}\.\d{4}-\d",  # Padrão 0000.0000.0000-0
+            r"\d{4}\.\d{3,4}\/\d{4}",   # Padrão 0000.000/0000
+            r"PAA-\d{4}\/\d{4}",        # Padrão PAA-0000/0000
+            r"PA-\d{4}\/\d{4}"          # Padrão PA-0000/0000
+        ]
+        
+        for padrao in padroes:
+            match = re.search(padrao, texto)
+            if match: 
+                return match.group(0)
+        return None
+    except Exception as e:
+        logger.error(f"Erro ao extrair número do processo: {str(e)}")
+        return None
 
 def extrair_data_acidente(texto):
-    """Extrai data do acidente usando regex"""
-    padroes = [
-        r"Data do Acidente:?\s*(\d{2}/\d{2}/\d{4})",
-        r"Acidente ocorrido em:?\s*(\d{2}/\d{2}/\d{4})",
-        r"(\d{2}/\d{2}/\d{4}).*?(acidente|sinistro)"
-    ]
-    for padrao in padroes:
-        match = re.search(padrao, texto, re.IGNORECASE)
-        if match:
-            try:
+    """Extrai data do acidente com tratamento de erros"""
+    try:
+        padroes = [
+            r"Data do Acidente:?\s*(\d{2}/\d{2}/\d{4})",
+            r"Acidente ocorrido em:?\s*(\d{2}/\d{2}/\d{4})",
+            r"(\d{2}/\d{2}/\d{4}).*?(acidente|sinistro)"
+        ]
+        
+        for padrao in padroes:
+            match = re.search(padrao, texto, re.IGNORECASE)
+            if match:
                 data_str = match.group(1) if match.groups() else match.group(0)
-                return datetime.strptime(data_str, "%d/%m/%Y").date()
-            except ValueError:
-                continue
-    return None
+                try:
+                    return datetime.strptime(data_str, "%d/%m/%Y").date()
+                except ValueError:
+                    continue
+        return None
+    except Exception as e:
+        logger.error(f"Erro ao extrair data do acidente: {str(e)}")
+        return None
 
 @st.cache_data(show_spinner=False, max_entries=3, ttl=3600)
 def processar_pdf(uploaded_file, _hash, modo_rapido=False):
-    """Processa o PDF e retorna documentos encontrados com referência de páginas"""
+    """Processa o PDF com tratamento robusto de erros"""
     try:
         # Reset do ponteiro do arquivo
         uploaded_file.seek(0)
         file_bytes = uploaded_file.read()
         
-        # Configurações de processamento
+        # Configurações de processamento adaptáveis
         dpi = 150 if modo_rapido else 200
         max_paginas = 3 if modo_rapido else 10
         
@@ -187,52 +225,71 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
         status_text = st.empty()
         status_text.text("Iniciando processamento...")
         
-        # Conversão PDF para imagens
-        imagens = convert_from_bytes(
-            file_bytes,
-            dpi=dpi,
-            fmt='jpeg',
-            grayscale=True,
-            first_page=1,
-            last_page=max_paginas,
-            thread_count=1
-        )
+        # Conversão PDF para imagens com tratamento de erro
+        try:
+            imagens = convert_from_bytes(
+                file_bytes,
+                dpi=dpi,
+                fmt='jpeg',
+                grayscale=True,
+                first_page=1,
+                last_page=max_paginas,
+                thread_count=1
+            )
+        except Exception as e:
+            logger.error(f"Erro na conversão PDF: {str(e)}")
+            st.error("Erro ao converter PDF para imagens. Verifique se o arquivo é válido.")
+            return None
+            
         progress_bar.progress(20)
         
         # Processamento das páginas
         encontrados = {}
         texto_completo = ""
-        pdf_pages = []  # Armazena os bytes de cada página para visualização
+        pdf_pages = []
         
         for i, img in enumerate(imagens):
-            progresso = 20 + int(70 * (i / len(imagens)))
-            progress_bar.progress(progresso)
-            status_text.text(f"Analisando página {i+1}/{len(imagens)}...")
-            
-            if not pagina_vazia(img):
-                img_processed = preprocess_image(img)
-                texto = pytesseract.image_to_string(
-                    img_processed,
-                    lang='por',
-                    config=TESSERACT_CONFIG
-                )
-                texto_completo += f"\n\n--- PÁGINA {i+1} ---\n{texto}"
+            try:
+                progresso = 20 + int(70 * (i / len(imagens)))
+                progress_bar.progress(progresso)
+                status_text.text(f"Analisando página {i+1}/{len(imagens)}...")
                 
-                # Armazena a imagem da página para visualização
-                img_byte_arr = io.BytesIO()
-                img.save(img_byte_arr, format='JPEG')
-                pdf_pages.append(img_byte_arr.getvalue())
-                
-                # Verifica cada requisito no texto
-                for doc, artigo in REQUISITOS:
-                    if re.search(re.escape(doc.lower()), texto.lower()):
-                        if doc not in encontrados:
-                            encontrados[doc] = {
-                                "artigo": artigo,
-                                "paginas": [i+1]
-                            }
-                        else:
-                            encontrados[doc]["paginas"].append(i+1)
+                if not pagina_vazia(img):
+                    img_processed = preprocess_image(img)
+                    
+                    try:
+                        texto = pytesseract.image_to_string(
+                            img_processed,
+                            lang='por',
+                            config=TESSERACT_CONFIG
+                        )
+                    except Exception as e:
+                        logger.error(f"Erro no OCR da página {i+1}: {str(e)}")
+                        texto = ""  # Continua com texto vazio
+                    
+                    texto_completo += f"\n\n--- PÁGINA {i+1} ---\n{texto}"
+                    
+                    # Armazena a imagem da página para visualização
+                    try:
+                        img_byte_arr = io.BytesIO()
+                        img.save(img_byte_arr, format='JPEG')
+                        pdf_pages.append(img_byte_arr.getvalue())
+                    except Exception as e:
+                        logger.error(f"Erro ao salvar página {i+1}: {str(e)}")
+                    
+                    # Verifica cada requisito no texto
+                    for doc, artigo in REQUISITOS:
+                        if doc.lower() in texto.lower():  # Busca simples mais rápida
+                            if doc not in encontrados:
+                                encontrados[doc] = {
+                                    "artigo": artigo,
+                                    "paginas": [i+1]
+                                }
+                            else:
+                                encontrados[doc]["paginas"].append(i+1)
+            except Exception as e:
+                logger.error(f"Erro ao processar página {i+1}: {str(e)}")
+                continue
         
         progress_bar.progress(95)
         nao_encontrados = [doc for doc, _ in REQUISITOS if doc not in encontrados]
@@ -261,7 +318,7 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
         if 'status_text' in locals(): status_text.empty()
 
 def gerar_relatorio(resultados):
-    """Gera relatório em DOCX com referência de páginas"""
+    """Gera relatório em DOCX com tratamento de erros"""
     try:
         doc = Document()
         
@@ -301,7 +358,7 @@ def gerar_relatorio(resultados):
         doc.add_heading('DOCUMENTOS FALTANTES', level=1)
         if resultados['nao_encontrados']:
             for doc_name in resultados['nao_encontrados']:
-                artigo = next(artigo for doc, artigo in REQUISITOS if doc == doc_name)
+                artigo = next(artigo for d, artigo in REQUISITOS if d == doc_name)
                 doc.add_paragraph(f"✗ {doc_name} (Art. {artigo})", style='List Bullet')
         else:
             doc.add_paragraph("Todos os documentos foram encontrados", style='List Bullet')
@@ -364,6 +421,16 @@ def main():
         st.subheader("Seção de Afastamentos e Acidentes - BM/RS")
     with col2:
         st.image("https://i.imgur.com/By8hwnl.jpeg", width=120)
+
+    # Aviso sobre OCR se OpenCV não estiver disponível
+    if not CV2_AVAILABLE:
+        st.markdown("""
+        <div class="ocr-warning">
+        ⚠️ <strong>Atenção:</strong> O OpenCV não está instalado no ambiente. 
+        A qualidade do OCR pode ser reduzida. Recomenda-se instalar 
+        'opencv-python-headless' no arquivo requirements.txt.
+        </div>
+        """, unsafe_allow_html=True)
 
     # Sidebar
     with st.sidebar:
