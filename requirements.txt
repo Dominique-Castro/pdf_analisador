@@ -1,9 +1,8 @@
-streamlit==1.28.0
-pdf2image==1.16.3
-pytesseract==0.3.10
-python-docx==0.8.11
-python-dotenv==1.0.0
-cryptography==41.0.5
-opencv-python-headless==4.11.0
-streamlit==1.33.0
-numpy==1.26.0  # Caso use arrays com OpenCV
+opencv-python-headless>=4.8.0  # Versão mais flexível
+streamlit>=1.33.0  # Versão mais recente
+pdf2image>=1.16.3
+pytesseract>=0.3.10
+python-docx>=0.8.11
+python-dotenv>=1.0.0
+cryptography>=41.0.5
+numpy>=1.26.0  # Adicionei pois é dependência crítica
