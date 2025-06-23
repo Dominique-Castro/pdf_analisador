@@ -11,10 +11,19 @@ import base64
 import logging
 import re
 import hashlib
+import json
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 
 # ========== CONFIGURAÇÃO INICIAL ========== #
+nltk.download('stopwords')
+nltk.download('punkt')
+
 st.set_page_config(
-    page_title="Sistema de Análise Documental - BM/RS",
+    page_title="Sistema de Análise Documental Inteligente - BM/RS",
     page_icon="🛡️",
     layout="wide"
 )
@@ -32,68 +41,16 @@ except ImportError:
     Adicione 'opencv-python-headless' ao requirements.txt
     """)
 
-# ========== PALETA DE CORES MILITARES ========== #
+# ========== CONSTANTES E CONFIGURAÇÕES ========== #
+MODELOS_DIR = "modelos_documentos"
+os.makedirs(MODELOS_DIR, exist_ok=True)
+
 primary_color = "#006341"  # Verde BM
 secondary_color = "#D4AF37"  # Dourado
 accent_color = "#8B0000"  # Vermelho militar
 bg_color = "#F5F5F5"  # Fundo cinza claro
 
-# ========== CSS PERSONALIZADO ========== #
-st.markdown(f"""
-<style>
-    :root {{
-        --verde-bm: {primary_color};
-        --dourado: {secondary_color};
-        --vermelho-militar: {accent_color};
-        --bg-color: {bg_color};
-    }}
-    .stApp {{
-        background-color: var(--bg-color);
-    }}
-    .stButton>button {{
-        background-color: var(--verde-bm);
-        color: white;
-        border-radius: 8px;
-    }}
-    .stButton>button:hover {{
-        background-color: #004d33;
-        color: white;
-    }}
-    .badge-legal {{
-        background-color: var(--dourado);
-        color: #333;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-size: 0.8em;
-    }}
-    .container-bordered {{
-        border: 2px solid var(--verde-bm);
-        border-radius: 8px;
-        padding: 15px;
-        margin: 10px 0;
-        background-color: #FFFFFF;
-    }}
-    .stSpinner > div > div {{
-        border-top-color: var(--verde-bm) !important;
-    }}
-    .stAlert {{
-        border-left: 4px solid var(--vermelho-militar);
-    }}
-    .pdf-viewer {{
-        border: 2px solid var(--verde-bm);
-        border-radius: 8px;
-    }}
-    .ocr-warning {{
-        background-color: #FFF3E0;
-        padding: 10px;
-        border-radius: 5px;
-        margin: 10px 0;
-    }}
-</style>
-""", unsafe_allow_html=True)
-
-# ========== CONFIGURAÇÕES TÉCNICAS ========== #
-# Configuração do Tesseract (com fallback)
+# Configuração do Tesseract
 try:
     pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
     TESSERACT_CONFIG = "--oem 1 --psm 6"
@@ -104,6 +61,55 @@ except Exception as e:
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ========== MODELO DE DOCUMENTO ========== #
+class DocumentModel:
+    def __init__(self, nome, artigo, keywords=None, model_text=None, min_similarity=0.7):
+        self.nome = nome
+        self.artigo = artigo
+        self.keywords = keywords or []
+        self.model_text = model_text or ""
+        self.min_similarity = min_similarity
+        self.vectorizer = TfidfVectorizer(stop_words='portuguese')
+        
+    def train(self, text_samples):
+        """Treina o modelo com amostras de texto"""
+        if not isinstance(text_samples, list):
+            text_samples = [text_samples]
+        self.model_text = "\n".join(text_samples)
+        self.keywords = self._extract_keywords(text_samples)
+        
+    def _extract_keywords(self, texts):
+        """Extrai palavras-chave importantes"""
+        stop_words = set(stopwords.words('portuguese'))
+        words = []
+        for text in texts:
+            tokens = word_tokenize(text.lower())
+            words += [word for word in tokens if word.isalpha() and word not in stop_words]
+        
+        word_counts = Counter(words)
+        return [word for word, count in word_counts.most_common(20)]
+    
+    def match(self, text):
+        """Verifica se o texto corresponde a este modelo de documento"""
+        # Verificação por palavras-chave
+        text_lower = text.lower()
+        keyword_matches = sum(1 for kw in self.keywords if kw.lower() in text_lower)
+        keyword_score = keyword_matches / len(self.keywords) if self.keywords else 0
+        
+        # Verificação por similaridade de texto
+        if self.model_text:
+            try:
+                vectors = self.vectorizer.fit_transform([self.model_text, text])
+                similarity = cosine_similarity(vectors[0:1], vectors[1:2])[0][0]
+            except:
+                similarity = 0
+        else:
+            similarity = 0
+        
+        # Combina os scores
+        combined_score = (keyword_score * 0.6) + (similarity * 0.4)
+        return combined_score >= self.min_similarity
 
 # ========== LISTA DE REQUISITOS ========== #
 REQUISITOS = [
@@ -126,30 +132,48 @@ REQUISITOS = [
 ]
 
 # ========== FUNÇÕES AUXILIARES ========== #
+def carregar_modelos():
+    modelos = []
+    for doc, artigo in REQUISITOS:
+        model_path = os.path.join(MODELOS_DIR, f"{doc}.json")
+        if os.path.exists(model_path):
+            with open(model_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                modelos.append(DocumentModel(
+                    nome=data['nome'],
+                    artigo=data['artigo'],
+                    keywords=data['keywords'],
+                    model_text=data['model_text'],
+                    min_similarity=data.get('min_similarity', 0.7)
+                ))
+        else:
+            modelos.append(DocumentModel(
+                nome=doc,
+                artigo=artigo,
+                keywords=[doc.split()[0].lower()],
+                min_similarity=0.5
+            ))
+    return modelos
+
 def pagina_vazia(img, threshold=0.95):
-    """Verifica se a página é predominantemente vazia com otimização"""
+    """Verifica se a página é predominantemente vazia"""
     try:
-        # Converte para escala de cinza se necessário
         if img.mode != 'L':
             img = img.convert('L')
-        
-        # Usa numpy para cálculo eficiente
         img_array = np.array(img)
         white_pixels = np.sum(img_array > 200)
         total_pixels = img_array.size
-        
         return (white_pixels / total_pixels) > threshold
     except Exception as e:
         logger.error(f"Erro ao verificar página vazia: {str(e)}")
         return False
 
 def preprocess_image(img):
-    """Processamento otimizado da imagem para OCR com fallback"""
+    """Processamento otimizado da imagem para OCR"""
     try:
         img_np = np.array(img)
         
         if CV2_AVAILABLE:
-            # Processamento com OpenCV (mais eficiente)
             if len(img_np.shape) == 3:
                 img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
             img_np = cv2.adaptiveThreshold(
@@ -157,7 +181,6 @@ def preprocess_image(img):
                 cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                 cv2.THRESH_BINARY, 11, 2)
         else:
-            # Fallback sem OpenCV
             if len(img_np.shape) == 3:
                 img_np = np.dot(img_np[...,:3], [0.2989, 0.5870, 0.1140])
             img_np = (img_np > 128).astype(np.uint8) * 255
@@ -165,148 +188,106 @@ def preprocess_image(img):
         return Image.fromarray(img_np)
     except Exception as e:
         logger.error(f"Erro no pré-processamento: {str(e)}")
-        return img  # Retorna a imagem original em caso de erro
+        return img
 
-def extrair_numero_processo(texto):
-    """Extrai número do processo usando regex otimizado"""
-    try:
-        padroes = [
-            r"\d{4}\.\d{4}\.\d{4}-\d",  # Padrão 0000.0000.0000-0
-            r"\d{4}\.\d{3,4}\/\d{4}",   # Padrão 0000.000/0000
-            r"PAA-\d{4}\/\d{4}",        # Padrão PAA-0000/0000
-            r"PA-\d{4}\/\d{4}"          # Padrão PA-0000/0000
-        ]
-        
-        for padrao in padroes:
-            match = re.search(padrao, texto)
-            if match: 
-                return match.group(0)
-        return None
-    except Exception as e:
-        logger.error(f"Erro ao extrair número do processo: {str(e)}")
-        return None
-
-def extrair_data_acidente(texto):
-    """Extrai data do acidente com tratamento de erros"""
-    try:
-        padroes = [
-            r"Data do Acidente:?\s*(\d{2}/\d{2}/\d{4})",
-            r"Acidente ocorrido em:?\s*(\d{2}/\d{2}/\d{4})",
-            r"(\d{2}/\d{2}/\d{4}).*?(acidente|sinistro)"
-        ]
-        
-        for padrao in padroes:
-            match = re.search(padrao, texto, re.IGNORECASE)
-            if match:
-                data_str = match.group(1) if match.groups() else match.group(0)
-                try:
-                    return datetime.strptime(data_str, "%d/%m/%Y").date()
-                except ValueError:
-                    continue
-        return None
-    except Exception as e:
-        logger.error(f"Erro ao extrair data do acidente: {str(e)}")
-        return None
+def extrair_metadados(texto):
+    """Extrai metadados importantes do texto"""
+    resultados = {
+        'numero_processo': None,
+        'data_acidente': None
+    }
+    
+    # Padrões para número do processo
+    padroes_processo = [
+        r"\d{4}\.\d{4}\.\d{4}-\d",
+        r"\d{4}\.\d{3,4}\/\d{4}",
+        r"PAA-\d{4}\/\d{4}",
+        r"PA-\d{4}\/\d{4}"
+    ]
+    
+    for padrao in padroes_processo:
+        match = re.search(padrao, texto)
+        if match: 
+            resultados['numero_processo'] = match.group(0)
+            break
+    
+    # Padrões para data do acidente
+    padroes_data = [
+        r"Data do Acidente:?\s*(\d{2}/\d{2}/\d{4})",
+        r"Acidente ocorrido em:?\s*(\d{2}/\d{2}/\d{4})",
+        r"(\d{2}/\d{2}/\d{4}).*?(acidente|sinistro)"
+    ]
+    
+    for padrao in padroes_data:
+        match = re.search(padrao, texto, re.IGNORECASE)
+        if match:
+            data_str = match.group(1) if match.groups() else match.group(0)
+            try:
+                resultados['data_acidente'] = datetime.strptime(data_str, "%d/%m/%Y").date()
+                break
+            except ValueError:
+                continue
+    
+    return resultados
 
 @st.cache_data(show_spinner=False, max_entries=3, ttl=3600)
 def processar_pdf(uploaded_file, _hash, modo_rapido=False):
-    """Processa o PDF com tratamento robusto de erros"""
+    """Processa o PDF e extrai texto de cada página"""
     try:
-        # Reset do ponteiro do arquivo
         uploaded_file.seek(0)
         file_bytes = uploaded_file.read()
         
-        # Configurações de processamento adaptáveis
         dpi = 150 if modo_rapido else 200
         max_paginas = 3 if modo_rapido else 10
         
-        # Barra de progresso
         progress_bar = st.progress(0)
         status_text = st.empty()
         status_text.text("Iniciando processamento...")
         
-        # Conversão PDF para imagens com tratamento de erro
-        try:
-            imagens = convert_from_bytes(
-                file_bytes,
-                dpi=dpi,
-                fmt='jpeg',
-                grayscale=True,
-                first_page=1,
-                last_page=max_paginas,
-                thread_count=1
-            )
-        except Exception as e:
-            logger.error(f"Erro na conversão PDF: {str(e)}")
-            st.error("Erro ao converter PDF para imagens. Verifique se o arquivo é válido.")
-            return None
-            
+        imagens = convert_from_bytes(
+            file_bytes,
+            dpi=dpi,
+            fmt='jpeg',
+            grayscale=True,
+            first_page=1,
+            last_page=max_paginas,
+            thread_count=1
+        )
         progress_bar.progress(20)
         
-        # Processamento das páginas
-        encontrados = {}
-        texto_completo = ""
+        textos_paginas = []
         pdf_pages = []
         
         for i, img in enumerate(imagens):
-            try:
-                progresso = 20 + int(70 * (i / len(imagens)))
-                progress_bar.progress(progresso)
-                status_text.text(f"Analisando página {i+1}/{len(imagens)}...")
+            progresso = 20 + int(70 * (i / len(imagens)))
+            progress_bar.progress(progresso)
+            status_text.text(f"Analisando página {i+1}/{len(imagens)}...")
+            
+            if not pagina_vazia(img):
+                img_processed = preprocess_image(img)
+                texto = pytesseract.image_to_string(
+                    img_processed,
+                    lang='por',
+                    config=TESSERACT_CONFIG
+                )
+                textos_paginas.append((i+1, texto))
                 
-                if not pagina_vazia(img):
-                    img_processed = preprocess_image(img)
-                    
-                    try:
-                        texto = pytesseract.image_to_string(
-                            img_processed,
-                            lang='por',
-                            config=TESSERACT_CONFIG
-                        )
-                    except Exception as e:
-                        logger.error(f"Erro no OCR da página {i+1}: {str(e)}")
-                        texto = ""  # Continua com texto vazio
-                    
-                    texto_completo += f"\n\n--- PÁGINA {i+1} ---\n{texto}"
-                    
-                    # Armazena a imagem da página para visualização
-                    try:
-                        img_byte_arr = io.BytesIO()
-                        img.save(img_byte_arr, format='JPEG')
-                        pdf_pages.append(img_byte_arr.getvalue())
-                    except Exception as e:
-                        logger.error(f"Erro ao salvar página {i+1}: {str(e)}")
-                    
-                    # Verifica cada requisito no texto
-                    for doc, artigo in REQUISITOS:
-                        if doc.lower() in texto.lower():  # Busca simples mais rápida
-                            if doc not in encontrados:
-                                encontrados[doc] = {
-                                    "artigo": artigo,
-                                    "paginas": [i+1]
-                                }
-                            else:
-                                encontrados[doc]["paginas"].append(i+1)
-            except Exception as e:
-                logger.error(f"Erro ao processar página {i+1}: {str(e)}")
-                continue
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format='JPEG')
+                pdf_pages.append(img_byte_arr.getvalue())
         
         progress_bar.progress(95)
-        nao_encontrados = [doc for doc, _ in REQUISITOS if doc not in encontrados]
         
-        # Extrai metadados
-        numero_processo = extrair_numero_processo(texto_completo)
-        data_acidente = extrair_data_acidente(texto_completo)
+        # Extrai metadados do texto completo
+        texto_completo = "\n\n".join(f"--- PÁGINA {num} ---\n{text}" for num, text in textos_paginas)
+        metadados = extrair_metadados(texto_completo)
         
         progress_bar.progress(100)
         return {
-            "encontrados": encontrados,
-            "nao_encontrados": nao_encontrados,
-            "texto": texto_completo,
-            "numero_processo": numero_processo,
-            "data_acidente": data_acidente,
+            "textos_paginas": textos_paginas,
             "pdf_pages": pdf_pages,
-            "total_pages": len(imagens)
+            "total_pages": len(imagens),
+            **metadados
         }
         
     except Exception as e:
@@ -317,8 +298,33 @@ def processar_pdf(uploaded_file, _hash, modo_rapido=False):
         if 'progress_bar' in locals(): progress_bar.empty()
         if 'status_text' in locals(): status_text.empty()
 
+def analisar_com_modelos(textos_paginas):
+    """Analisa as páginas usando os modelos treinados"""
+    modelos = carregar_modelos()
+    encontrados = {}
+    
+    for modelo in modelos:
+        paginas_encontradas = []
+        
+        for num_pagina, texto in textos_paginas:
+            if modelo.match(texto):
+                paginas_encontradas.append(num_pagina)
+        
+        if paginas_encontradas:
+            encontrados[modelo.nome] = {
+                'artigo': modelo.artigo,
+                'paginas': paginas_encontradas
+            }
+    
+    nao_encontrados = [doc for doc, _ in REQUISITOS if doc not in encontrados]
+    
+    return {
+        'encontrados': encontrados,
+        'nao_encontrados': nao_encontrados
+    }
+
 def gerar_relatorio(resultados):
-    """Gera relatório em DOCX com tratamento de erros"""
+    """Gera relatório em DOCX com os resultados"""
     try:
         doc = Document()
         
@@ -370,7 +376,6 @@ def gerar_relatorio(resultados):
         doc.add_paragraph("SD PM Dominique Castro")
         doc.add_paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
         
-        # Salva em buffer
         buffer = io.BytesIO()
         doc.save(buffer)
         buffer.seek(0)
@@ -390,7 +395,6 @@ def mostrar_pdf(pdf_pages):
             
         st.markdown("### Visualizador de Documento")
         
-        # Controle de páginas
         col1, col2, _ = st.columns([1, 1, 3])
         with col1:
             page_num = st.number_input(
@@ -401,7 +405,6 @@ def mostrar_pdf(pdf_pages):
                 step=1
             )
         
-        # Exibe a página selecionada
         st.image(
             pdf_pages[page_num-1],
             caption=f"Página {page_num} de {len(pdf_pages)}",
@@ -412,12 +415,106 @@ def mostrar_pdf(pdf_pages):
         logger.error(f"Erro ao exibir PDF: {str(e)}")
         st.error("Erro ao carregar visualizador de documento")
 
+def treinar_modelo_interface():
+    """Interface para treinamento de novos modelos"""
+    st.sidebar.markdown("## 🛠 Treinar Novos Modelos")
+    doc_selecionado = st.sidebar.selectbox(
+        "Selecione o documento para treinar",
+        [doc for doc, _ in REQUISITOS]
+    )
+    
+    uploaded_samples = st.sidebar.file_uploader(
+        f"Carregue amostras de '{doc_selecionado}' (PDF ou TXT)",
+        type=["pdf", "txt"],
+        accept_multiple_files=True
+    )
+    
+    if uploaded_samples and st.sidebar.button("Treinar Modelo"):
+        textos_amostra = []
+        for sample in uploaded_samples:
+            if sample.name.endswith('.pdf'):
+                images = convert_from_bytes(sample.read())
+                text = "\n".join(pytesseract.image_to_string(img) for img in images)
+                textos_amostra.append(text)
+            elif sample.name.endswith('.txt'):
+                textos_amostra.append(sample.read().decode('utf-8'))
+        
+        if textos_amostra:
+            modelo = DocumentModel(doc_selecionado, next(artigo for d, artigo in REQUISITOS if d == doc_selecionado))
+            modelo.train(textos_amostra)
+            
+            model_path = os.path.join(MODELOS_DIR, f"{doc_selecionado}.json")
+            with open(model_path, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'nome': modelo.nome,
+                    'artigo': modelo.artigo,
+                    'keywords': modelo.keywords,
+                    'model_text': modelo.model_text,
+                    'min_similarity': modelo.min_similarity
+                }, f, ensure_ascii=False, indent=2)
+            
+            st.sidebar.success(f"Modelo para '{doc_selecionado}' treinado com {len(textos_amostra)} amostras!")
+
 # ========== INTERFACE PRINCIPAL ========== #
 def main():
+    # CSS Personalizado
+    st.markdown(f"""
+    <style>
+        :root {{
+            --verde-bm: {primary_color};
+            --dourado: {secondary_color};
+            --vermelho-militar: {accent_color};
+            --bg-color: {bg_color};
+        }}
+        .stApp {{
+            background-color: var(--bg-color);
+        }}
+        .stButton>button {{
+            background-color: var(--verde-bm);
+            color: white;
+            border-radius: 8px;
+        }}
+        .stButton>button:hover {{
+            background-color: #004d33;
+            color: white;
+        }}
+        .badge-legal {{
+            background-color: var(--dourado);
+            color: #333;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }}
+        .container-bordered {{
+            border: 2px solid var(--verde-bm);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #FFFFFF;
+        }}
+        .stSpinner > div > div {{
+            border-top-color: var(--verde-bm) !important;
+        }}
+        .stAlert {{
+            border-left: 4px solid var(--vermelho-militar);
+        }}
+        .pdf-viewer {{
+            border: 2px solid var(--verde-bm);
+            border-radius: 8px;
+        }}
+        .ocr-warning {{
+            background-color: #FFF3E0;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+
     # Header institucional
     col1, col2 = st.columns([4,1])
     with col1:
-        st.title("Sistema de Análise Documental")
+        st.title("Sistema de Análise Documental Inteligente")
         st.subheader("Seção de Afastamentos e Acidentes - BM/RS")
     with col2:
         st.image("https://i.imgur.com/By8hwnl.jpeg", width=120)
@@ -448,6 +545,9 @@ def main():
         Seção de Afastamentos e Acidentes  
         *Versão 3.2 - {datetime.now().year}*
         """)
+        
+        # Interface de treinamento
+        treinar_modelo_interface()
 
     # Seção de informações do processo
     with st.container():
@@ -491,10 +591,20 @@ def main():
     if uploaded_file is not None:
         file_hash = hashlib.md5(uploaded_file.getvalue()).hexdigest()
         
-        with st.spinner('Processando documento...'):
-            resultados = processar_pdf(uploaded_file, file_hash, modo_rapido)
+        with st.spinner('Processando documento com reconhecimento inteligente...'):
+            # Processa o PDF e extrai texto das páginas
+            processamento = processar_pdf(uploaded_file, file_hash, modo_rapido)
             
-            if resultados is not None:
+            if processamento is not None:
+                # Analisa os textos com os modelos treinados
+                analise = analisar_com_modelos(processamento['textos_paginas'])
+                
+                # Combina os resultados
+                resultados = {
+                    **processamento,
+                    **analise
+                }
+                
                 # Atualiza campos com valores extraídos
                 if resultados.get('numero_processo'):
                     numero_processo = resultados['numero_processo']
