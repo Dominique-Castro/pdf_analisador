@@ -1,5 +1,74 @@
-# ... (todo o código anterior permanece EXATAMENTE igual)
+import os
+import numpy as np
+from PIL import Image
+import pytesseract
+from pdf2image import convert_from_bytes
+from datetime import datetime
+import logging
+import re
+from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
+import json
 
+# ========== CONFIGURAÇÃO INICIAL ========== #
+st.set_page_config(
+    page_title="Sistema de Análise Documental - BM/RS",
+    page_icon="🛡️",
+    layout="wide"
+)
+
+# Configurações do Tesseract
+try:
+    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+    TESSERACT_CONFIG = "--oem 3 --psm 6 -l por+eng"
+except Exception as e:
+    st.warning(f"Configuração do Tesseract não encontrada: {str(e)}")
+    TESSERACT_CONFIG = ""
+
+# Configuração de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ========== MODELOS DE DOCUMENTOS ========== #
+DOCUMENTOS_PADRAO = [
+    # ... (seus modelos de documentos aqui)
+]
+
+# ========== NOVAS FUNÇÕES PARA ANÁLISE DE ACIDENTES ========== #
+class AcidenteAnalyzer:
+    # ... (mantenha a classe AcidenteAnalyzer como estava)
+
+# ========== FUNÇÕES AUXILIARES ========== #
+def limpar_texto(texto: str) -> str:
+    # ... (mantenha a função limpar_texto como estava)
+
+def pagina_vazia(img, threshold: float = 0.95) -> bool:
+    # ... (mantenha a função pagina_vazia como estava)
+
+def preprocess_image(img):
+    # ... (mantenha a função preprocess_image como estava)
+
+# ========== FUNÇÕES PRINCIPAIS ========== #
+@st.cache_data(show_spinner=False)
+def processar_pdf(uploaded_file, modo_rapido: bool = False) -> Dict[str, any]:
+    # ... (mantenha a função processar_pdf como estava)
+
+def extrair_metadados(texto: str) -> Dict[str, any]:
+    # ... (mantenha a função extrair_metadados como estava)
+
+def identificar_documento(texto: str) -> Optional[Dict[str, str]]:
+    # ... (mantenha a função identificar_documento como estava)
+
+def analisar_documentos(resultados_processamento: Dict[str, any]) -> Dict[str, any]:
+    # ... (mantenha a função analisar_documentos como estava)
+
+def gerar_relatorio(resultados: Dict[str, any]) -> str:
+    # ... (mantenha a função gerar_relatorio como estava)
+
+def mostrar_visualizador(imagens_paginas: List[Image], documentos_encontrados: Dict[str, List[Dict]]):
+    # ... (mantenha a função mostrar_visualizador como estava)
+
+# ========== INTERFACE STREAMLIT ========== #
 def main():
     # CSS Personalizado
     st.markdown("""
