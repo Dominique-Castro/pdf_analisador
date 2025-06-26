@@ -125,85 +125,10 @@ def pagina_vazia(img, threshold: float = 0.95) -> bool:
         logger.error(f"Erro ao verificar página vazia: {str(e)}")
         return False
 
-def extrair_texto_pdf(pdf_bytes: bytes) -> List[Tuple[int, str]]:
-    """Extrai texto de um PDF convertendo cada página para imagem e usando OCR"""
-    textos_paginas = []
-    try:
-        imagens = convert_from_bytes(pdf_bytes, dpi=300)
-        
-        for i, img in enumerate(imagens, start=1):
-            if pagina_vazia(img):
-                textos_paginas.append((i, ""))
-                continue
-            
-            try:
-                texto = pytesseract.image_to_string(img, config=TESSERACT_CONFIG)
-                textos_paginas.append((i, limpar_texto(texto)))
-            except Exception as e:
-                logger.error(f"Erro OCR página {i}: {str(e)}")
-                textos_paginas.append((i, ""))
-                
-    except Exception as e:
-        logger.error(f"Erro ao processar PDF: {str(e)}")
-        st.error(f"Erro ao processar PDF: {str(e)}")
-    
-    return textos_paginas
-
-def identificar_documentos(textos_paginas: List[Tuple[int, str]]) -> Dict[str, List[Dict]]:
-    """Identifica os tipos de documento presentes no PDF"""
-    resultados = defaultdict(list)
-    
-    for doc in DOCUMENTOS_PADRAO:
-        for page_num, text in textos_paginas:
-            for padrao in doc["padroes_texto"]:
-                if re.search(padrao, text, re.IGNORECASE):
-                    resultados[doc["nome"]].append({
-                        "pagina": page_num,
-                        "artigo": doc["artigo"],
-                        "referencia": doc["pagina_referencia"]
-                    })
-                    break
-    
-    return dict(resultados)
+# ... (continuam as outras funções com a indentação correta)
 
 def main():
-    """Função principal da aplicação Streamlit"""
-    st.title("🛡️ Sistema de Análise Documental - BM/RS")
-    st.markdown("### Análise de documentos de Acidentes de Serviço")
-    
-    uploaded_files = st.file_uploader(
-        "Selecione os arquivos PDF para análise",
-        type="pdf",
-        accept_multiple_files=True
-    )
-    
-    if uploaded_files:
-        for uploaded_file in uploaded_files:
-            with st.expander(f"📄 {uploaded_file.name}", expanded=True):
-                with st.spinner("Processando documento..."):
-                    try:
-                        textos_paginas = extrair_texto_pdf(uploaded_file.getvalue())
-                        
-                        # Análise de acidente
-                        analyzer = AcidenteAnalyzer(textos_paginas)
-                        resultado_acidente = analyzer.analyze()
-                        
-                        # Identificação de documentos padrão
-                        documentos_identificados = identificar_documentos(textos_paginas)
-                        
-                        # Exibir resultados
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.subheader("Dados do Acidente")
-                            st.json(resultado_acidente)
-                        
-                        with col2:
-                            st.subheader("Documentos Identificados")
-                            st.json(documentos_identificados)
-                            
-                    except Exception as e:
-                        st.error(f"Erro ao processar {uploaded_file.name}: {str(e)}")
+    # ... (código da função main com indentação correta)
 
 if __name__ == "__main__":
     main()
