@@ -128,7 +128,19 @@ def pagina_vazia(img, threshold: float = 0.95) -> bool:
 # ... (continuam as outras funções com a indentação correta)
 
 def main():
-    # ... (código da função main com indentação correta)
+    st.title("Sistema de Análise Documental")
+    st.write("Carregue arquivos PDF para análise")
+    
+    uploaded_files = st.file_uploader("Selecione os arquivos PDF", type="pdf", accept_multiple_files=True)
+    
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            with st.spinner(f"Processando {uploaded_file.name}..."):
+                try:
+                    # Your processing code here
+                    pass
+                except Exception as e:
+                    st.error(f"Erro ao processar {uploaded_file.name}: {str(e)}")
 
 if __name__ == "__main__":
     main()
