@@ -1,219 +1,103 @@
+import dash
+from dash import dcc, html, Input, Output, State, dash_table, callback
+import base64
 import os
-import numpy as np
-from PIL import Image
-import pytesseract
-from pdf2image import convert_from_bytes
-from datetime import datetime
+from processors.pdf_processor import process_pdf
+from processors.pattern_matcher import identificar_documentos
+from flask_caching import Cache
 import logging
-import re
-from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
-import json
 
-# ========== CONFIGURAÇÃO INICIAL ========== #
-st.set_page_config(
-    page_title="Sistema de Análise Documental - BM/RS",
-    page_icon="🛡️",
-    layout="wide"
-)
-
-# Configurações do Tesseract
-try:
-    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
-    TESSERACT_CONFIG = "--oem 3 --psm 6 -l por+eng"
-except Exception as e:
-    st.warning(f"Configuração do Tesseract não encontrada: {str(e)}")
-    TESSERACT_CONFIG = ""
-
-# Configuração de logging
+# Configuração
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ========== MODELOS DE DOCUMENTOS ========== #
-DOCUMENTOS_PADRAO = [
-    # ... (seus modelos de documentos aqui)
-]
+app = dash.Dash(__name__, assets_folder="assets")
+app.title = "Analisador Documental - BM/RS"
+cache = Cache(app.server, config={'CACHE_TYPE': 'SimpleCache'})
 
-# ========== NOVAS FUNÇÕES PARA ANÁLISE DE ACIDENTES ========== #
-class AcidenteAnalyzer:
-    # ... (mantenha a classe AcidenteAnalyzer como estava)
-
-# ========== FUNÇÕES AUXILIARES ========== #
-def limpar_texto(texto: str) -> str:
-    # ... (mantenha a função limpar_texto como estava)
-
-def pagina_vazia(img, threshold: float = 0.95) -> bool:
-    # ... (mantenha a função pagina_vazia como estava)
-
-def preprocess_image(img):
-    # ... (mantenha a função preprocess_image como estava)
-
-# ========== FUNÇÕES PRINCIPAIS ========== #
-@st.cache_data(show_spinner=False)
-def processar_pdf(uploaded_file, modo_rapido: bool = False) -> Dict[str, any]:
-    # ... (mantenha a função processar_pdf como estava)
-
-def extrair_metadados(texto: str) -> Dict[str, any]:
-    # ... (mantenha a função extrair_metadados como estava)
-
-def identificar_documento(texto: str) -> Optional[Dict[str, str]]:
-    # ... (mantenha a função identificar_documento como estava)
-
-def analisar_documentos(resultados_processamento: Dict[str, any]) -> Dict[str, any]:
-    # ... (mantenha a função analisar_documentos como estava)
-
-def gerar_relatorio(resultados: Dict[str, any]) -> str:
-    # ... (mantenha a função gerar_relatorio como estava)
-
-def mostrar_visualizador(imagens_paginas: List[Image], documentos_encontrados: Dict[str, List[Dict]]):
-    # ... (mantenha a função mostrar_visualizador como estava)
-
-# ========== INTERFACE STREAMLIT ========== #
-def main():
-    # CSS Personalizado
-    st.markdown("""
-    <style>
-        /* ... (mantenha seu CSS personalizado) */
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Header institucional
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.title("Sistema de Análise Documental - BM/RS")
-        st.subheader("Seção de Afastamentos e Acidentes")
-    with col2:
-        st.image("https://i.imgur.com/By8hwnl.jpeg", width=120)
-
-    # Sidebar
-    with st.sidebar:
-        st.image("https://i.imgur.com/By8hwnl.jpeg", use_column_width=True)
-        st.markdown("""
-        ### 🔍 Normativos de Referência
-        - Decreto nº 32.280/1986
-        - NI EMBM 1.26/2023
-        - Regulamento Disciplinar (RDBM)
-        """)
-        st.markdown("---")
-        st.markdown("""
-        ### 📌 Responsável Técnico
-        **SD PM Dominique Castro**  
-        Seção de Afastamentos e Acidentes  
-        *Versão 4.0 - 2024*
-        """)
-
-    # Seção de upload de documento
-    uploaded_file = None  # Inicializa a variável
+# Layout da Interface
+app.layout = html.Div([
+    # Cabeçalho
+    html.Div([
+        html.Img(src="/assets/logo.png", height=80),
+        html.H1("Sistema de Análise Documental", className="header-title"),
+        html.P("Seção de Afastamentos e Acidentes", className="header-subtitle")
+    ], className="header"),
     
-    with st.container():
-        st.markdown('<div class="container-bordered">', unsafe_allow_html=True)
-        st.subheader("📂 Documento para Análise")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            modo_rapido = st.toggle(
-                "Modo rápido (análise parcial)", 
-                value=True,
-                help="Analisa apenas as primeiras páginas para maior velocidade"
-            )
-        with col2:
-            st.markdown("""
-            <div style="font-size: 0.9em; color: #666;">
-            💡 Dica: Para documentos grandes, use o modo rápido para uma análise inicial.
-            </div>
-            """, unsafe_allow_html=True)
-        
-        uploaded_file = st.file_uploader(
-            "Carregue o arquivo PDF do processo", 
-            type=["pdf"],
-            label_visibility="collapsed"
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Upload de Arquivo
+    dcc.Upload(
+        id='upload-data',
+        children=html.Div([
+            'Arraste o PDF ou ',
+            html.A('Selecione o Arquivo')
+        ]),
+        multiple=False,
+        className="upload-area"
+    ),
+    
+    # Barra de Progresso
+    dcc.Loading(
+        id="loading-progress",
+        children=[html.Div(id="progress-status")],
+        type="circle"
+    ),
+    
+    # Resultados
+    html.Div(id='output-analysis', className="results-container")
+], className="main-container")
 
-    # Processamento do documento
-    if uploaded_file is not None:
-        with st.spinner('Processando documento...'):
-            processamento = processar_pdf(uploaded_file, modo_rapido)
-            
-            if processamento is not None:
-                resultados = analisar_documentos(processamento)
-                
-                st.success("Análise concluída com sucesso!")
-                
-                tab1, tab2, tab3, tab4 = st.tabs([
-                    "📋 Relatório", 
-                    "✅ Documentos Encontrados", 
-                    "❌ Documentos Faltantes",
-                    "🔍 Análise de Acidente"
-                ])
-                
-                with tab1:
-                    st.text_area("Relatório Completo", 
-                                gerar_relatorio(resultados), 
-                                height=400,
-                                key="relatorio_texto")
+# Callback para Processamento
+@app.callback(
+    Output('output-analysis', 'children'),
+    Input('upload-data', 'contents'),
+    prevent_initial_call=True
+)
+@cache.memoize(timeout=300)  # Cache de 5 minutos
+def update_output(contents):
+    if not contents:
+        return html.Div("Nenhum arquivo carregado")
+    
+    try:
+        _, content_string = contents.split(',')
+        decoded = base64.b64decode(content_string)
+        
+        # Processamento do PDF (sua lógica original adaptada)
+        resultados = process_pdf(decoded)
+        
+        # Geração da Saída
+        return html.Div([
+            # Abas de Resultados
+            dcc.Tabs([
+                # Relatório Completo
+                dcc.Tab(label="📋 Relatório", children=[
+                    html.H3("Texto Extraído"),
+                    html.Pre(resultados['texto'][:5000] + "..." if len(resultados['texto']) > 5000 else resultados['texto']),
                     
-                    st.download_button(
-                        label="📥 Baixar Relatório em TXT",
-                        data=gerar_relatorio(resultados),
-                        file_name=f"relatorio_{resultados['metadados'].get('numero_processo', 'sem_numero')}.txt",
-                        mime="text/plain"
+                    html.H3("Documentos Identificados"),
+                    dash_table.DataTable(
+                        data=resultados['documentos'],
+                        columns=[{"name": "Tipo", "id": "tipo"}, {"name": "Páginas", "id": "paginas"}],
+                        style_table={'overflowX': 'auto'}
                     )
+                ]),
                 
-                with tab2:
-                    if resultados["documentos_encontrados"]:
-                        progresso = len(resultados["documentos_encontrados"]) / len(DOCUMENTOS_PADRAO)
-                        st.metric("Completude Documental", f"{progresso:.0%}")
-                        
-                        for doc, info in resultados["documentos_encontrados"].items():
-                            paginas = ", ".join(str(item["pagina"]) for item in info)
-                            st.markdown(f"""
-                            <div style="padding:10px;margin:5px;background:#E8F5E9;border-radius:5px;">
-                            <b>{doc}</b> <span class='badge-legal'>Art. {info[0]['artigo']}</span>
-                            <div style="font-size:0.9em;margin-top:5px;">Páginas: {paginas}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                    else:
-                        st.warning("Nenhum documento encontrado")
-                
-                with tab3:
-                    if resultados["documentos_faltantes"]:
-                        for doc in resultados["documentos_faltantes"]:
-                            artigo = next(d["artigo"] for d in DOCUMENTOS_PADRAO if d["nome"] == doc)
-                            st.markdown(f"""
-                            <div style="padding:10px;margin:5px;background:#FFEBEE;border-radius:5px;">
-                            ❌ <b>{doc}</b> <span class='badge-legal'>Art. {artigo}</span>
-                            </div>
-                            """, unsafe_allow_html=True)
-                    else:
-                        st.success("Todos os documentos foram encontrados!")
+                # Análise de Acidente
+                dcc.Tab(label="🔍 Acidente", children=[
+                    html.Div([
+                        html.H4("Dados do Acidente"),
+                        html.P(f"Data: {resultados['data_acidente'] or 'Não encontrada'}"),
+                        html.P(f"PROA: {resultados['numero_proa'] or 'Não encontrado'}"),
+                        html.Hr(),
+                        html.H4("Páginas de Referência"),
+                        html.Ul([html.Li(f"Página {pg}") for pg in resultados['paginas_referencia']])
+                    ], className="accident-info")
+                ])
+            ])
+        ])
+        
+    except Exception as e:
+        logger.error(f"Erro no processamento: {str(e)}")
+        return html.Div(f"Erro na análise: {str(e)}", className="error-message")
 
-                with tab4:
-                    st.subheader("Informações Específicas do Acidente")
-                    
-                    if processamento["analise_acidente"]:
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.metric(
-                                "Data do Acidente", 
-                                processamento["analise_acidente"]["data_acidente"] or "Não encontrada",
-                                help=f"Páginas de referência: {', '.join(map(str, processamento['analise_acidente']['paginas_referencia']['data_acidente'])) or 'Nenhuma'}"
-                            )
-                        
-                        with col2:
-                            st.metric(
-                                "Número do PROA", 
-                                processamento["analise_acidente"]["numero_proa"] or "Não encontrado",
-                                help=f"Páginas de referência: {', '.join(map(str, processamento['analise_acidente']['paginas_referencia']['numero_proa'])) or 'Nenhuma'}"
-                            )
-                        
-                        st.json(processamento["analise_acidente"], expanded=False)
-                    else:
-                        st.warning("Nenhuma informação específica de acidente encontrada")
-
-                with st.expander("📄 Visualizador de Documento", expanded=False):
-                    mostrar_visualizador(resultados["imagens_paginas"], resultados["documentos_encontrados"])
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    app.run_server(debug=True)
