@@ -2,10 +2,14 @@ import dash
 from dash import dcc, html, Input, Output, State, dash_table, callback
 import base64
 import os
-from processors.pdf_processor import process_pdf
-from processors.pattern_matcher import identificar_documentos
-from flask_caching import Cache
+from processors.pdf_processor 
+import process_pdf
+from processors.pattern_matcher
+import identificar_documentos
+from flask_caching 
+import Cache
 import logging
+from processors.pdf_processor
 
 # Configuração
 logging.basicConfig(level=logging.INFO)
