@@ -33,16 +33,24 @@ logger = logging.getLogger(__name__)
 # ========== MODELOS DE DOCUMENTOS ========== #
 DOCUMENTOS_PADRAO = [
     {
-        "nome": "Portaria da Sindicância Especial",
-        "artigo": "NI 1.26 Art. 5º",
-        "padroes_texto": [
-            r"PORTARIA\s+N[º°]\s*\d+/SINDASV/\d{4}",
-            r"INSTAURAÇÃO\s+DE\s+SINDICÂNCIA\s+ESPECIAL",
-            r"DO\s+CMT\s+DO\s+\d+°\s+BPM.*?SINDICÂNCIA\s+ESPECIAL"
-        ],
-        "palavras_chave": ["portaria", "sindicância", "especial", "instauração", "acidente de serviço"],
-        "pagina_referencia": 3
-    }
+      class AcidenteAnalyzer:
+    def __init__(self, textos_paginas: List[Tuple[int, str]]):
+        self.textos_paginas = textos_paginas
+        self.resultados = {
+            'data_acidente': None,
+            'numero_proa': None,
+            'paginas_referencia': {
+                'data_acidente': [],
+                'numero_proa': []
+            }
+        }
+
+# Linha em branco aqui (importante!)
+def limpar_texto(texto: str) -> str:
+    """Normaliza o texto para análise"""
+    texto = re.sub(r'[^\w\sáéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇº°-]', ' ', texto)
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    return texto.upper()
 ]
 
 # ========== CLASSE DE ANÁLISE ========== #
