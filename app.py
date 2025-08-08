@@ -155,18 +155,13 @@ def extrair_texto_pdf(uploaded_file, modo_rapido=False):
         
         textos_paginas = []
         with st.spinner(f"Processando {len(imagens)} páginas..."):
-            with ThreadPoolExecutor() as executor:
-                futures = []
-                for i, img in enumerate(imagens):
-                    if not pagina_vazia(img):
-                        futures.append((i+1, executor.submit(processar_imagem_ocr, img)))
-                    else:
-                        futures.append((i+1, executor.submit(lambda: "")))
-                
-                for page_num, future in futures:
-                    texto = future.result()
-                    textos_paginas.append((page_num, texto.upper()))  # Padroniza para maiúsculas
-                    st.progress((page_num) / len(imagens))
+            for i, img in enumerate(imagens):
+                if not pagina_vazia(img):
+                    texto = processar_imagem_ocr(img)
+                    textos_paginas.append((i+1, texto.upper()))  # Padroniza para maiúsculas
+                else:
+                    textos_paginas.append((i+1, ""))
+                st.progress((i + 1) / len(imagens))
         
         return textos_paginas
     except Exception as e:
@@ -181,12 +176,15 @@ def identificar_documentos(textos_paginas):
         ocorrencias = []
         for page_num, text in textos_paginas:
             # Verifica pelos padrões de texto
+            encontrado = False
             for padrao in doc["padroes_texto"]:
                 if re.search(padrao, text, re.IGNORECASE):
                     ocorrencias.append(page_num)
+                    encontrado = True
                     break
+            
             # Verifica por palavras-chave se não encontrou por padrão
-            elif any(palavra in text.lower() for palavra in doc["palavras_chave"]):
+            if not encontrado and any(palavra in text.lower() for palavra in doc["palavras_chave"]):
                 ocorrencias.append(page_num)
         
         if ocorrencias:
@@ -220,7 +218,6 @@ def gerar_relatorio(documentos_identificados, filename="relatorio_analise.docx")
     
     # Documentos faltantes
     doc.add_heading('DOCUMENTOS FALTANTES', level=2)
-    documentos_encontrados = [doc["nome"] for doc in DOCUMENTOS_PADRAO]
     for doc in DOCUMENTOS_PADRAO:
         if doc["nome"] not in documentos_identificados:
             doc.add_paragraph(
