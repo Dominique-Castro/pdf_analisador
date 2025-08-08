@@ -20,19 +20,32 @@ st.set_page_config(
     layout="wide"
 )
 
-# Configuração simplificada do Tesseract (ajuste conforme seu sistema)
+# Configuração do Tesseract (ajuste conforme necessário)
 try:
     pytesseract.pytesseract.tesseract_cmd = os.getenv('TESSERACT_CMD', '/usr/bin/tesseract')
-    TESSERACT_CONFIG = "--oem 1 --psm 6"
+    TESSERACT_CONFIG = "--oem 3 --psm 6 -l por"
 except Exception as e:
-    st.warning(f"Configuração do Tesseract: {str(e)}")
-    TESSERACT_CONFIG = ""
+    st.error(f"Erro na configuração do Tesseract: {str(e)}")
+    st.stop()
 
 # ========== LISTA DE REQUISITOS ========== #
 REQUISITOS = [
-    ("Portaria da Sindicância Especial", "NI 1.26 Art. 5º"),
-    ("Parte de acidente", "Decreto 32.280 Art. 12"),
-    # ... (mantenha sua lista completa de requisitos)
+    ("PORTARIA DA SINDICÂNCIA ESPECIAL", "NI 1.26 Art. 5º"),
+    ("PARTE DE ACIDENTE", "Decreto 32.280 Art. 12"),
+    ("ATESTADO DE ORIGEM", "NI 1.26 Anexo III"),
+    ("PRIMEIRO BOLETIM MÉDICO", "RDBM Cap. VII"),
+    ("ESCALA DE SERVIÇO", "Portaria 095/SSP/15"),
+    ("ATA DE HABILITAÇÃO PARA CONDUZIR VIATURA", "NI 1.26 §2º Art. 8"),
+    ("DOCUMENTAÇÃO OPERACIONAL", "RDBM Art. 45"),
+    ("INQUÉRITO TÉCNICO", "Decreto 32.280 Art. 15"),
+    ("CNH VÁLIDA", "NI 1.26 Art. 10"),
+    ("FORMULÁRIO PREVISTO NA PORTARIA 095/SSP/15", ""),
+    ("OUVITURA DO ACIDENTADO", "RDBM Art. 78"),
+    ("OUVITURA DAS TESTEMUNHAS", "Decreto 32.280 Art. 18"),
+    ("PARECER DO ENCARREGADO", "NI 1.26 Art. 12"),
+    ("CONCLUSÃO DA AUTORIDADE NOMEANTE", "RDBM Art. 123"),
+    ("RHE", "NI 1.26 Anexo II"),
+    ("LTS", "Portaria 095/SSP/15")
 ]
 
 # ========== FUNÇÕES AUXILIARES ========== #
@@ -48,11 +61,10 @@ def pagina_vazia(img, threshold=0.95):
         return False
 
 def processar_imagem_ocr(img):
-    """Processa imagem para OCR"""
+    """Processa imagem para OCR com tratamento de erro"""
     try:
-        # Conversão básica para melhorar OCR
-        if img.mode != 'L':
-            img = img.convert('L')
+        # Pré-processamento básico da imagem
+        img = img.convert('L')  # Converte para escala de cinza
         return pytesseract.image_to_string(img, config=TESSERACT_CONFIG)
     except Exception as e:
         st.error(f"Erro no OCR: {str(e)}")
@@ -61,65 +73,111 @@ def processar_imagem_ocr(img):
 def extrair_texto_pdf(uploaded_file, modo_rapido=False):
     """Extrai texto do PDF com processamento paralelo"""
     try:
-        dpi = 150 if modo_rapido else 200
+        dpi = 200 if modo_rapido else 300
+        max_pages = 10 if modo_rapido else None
+        
+        # Converter PDF para imagens
         imagens = convert_from_bytes(
             uploaded_file.read(),
             dpi=dpi,
-            thread_count=min(4, os.cpu_count() or 2)
+            first_page=1,
+            last_page=max_pages,
+            thread_count=4
         )
         
+        # Processamento paralelo das páginas
         textos = []
-        with ThreadPoolExecutor() as executor:
-            futures = []
-            for img in imagens:
-                if not pagina_vazia(img):
-                    futures.append(executor.submit(processar_imagem_ocr, img))
-                else:
-                    futures.append(executor.submit(lambda: ""))
-            
-            for future in futures:
-                textos.append(future.result())
+        with st.spinner(f"Processando {len(imagens)} páginas..."):
+            with ThreadPoolExecutor() as executor:
+                futures = []
+                for img in imagens:
+                    if not pagina_vazia(img):
+                        futures.append(executor.submit(processar_imagem_ocr, img))
+                    else:
+                        futures.append(executor.submit(lambda: ""))
+                
+                for i, future in enumerate(futures):
+                    textos.append(future.result())
+                    st.progress((i + 1) / len(imagens))
         
         return "\n\n".join(textos)
     except Exception as e:
         st.error(f"Erro ao processar PDF: {str(e)}")
         return None
 
+def analisar_documentos(texto):
+    """Analisa o texto extraído e identifica documentos"""
+    texto = texto.upper()  # Padroniza para maiúsculas
+    
+    encontrados = {}
+    for doc, artigo in REQUISITOS:
+        # Verifica se o nome do documento está no texto
+        if doc in texto:
+            encontrados[doc] = {"artigo": artigo}
+    
+    nao_encontrados = [doc for doc, _ in REQUISITOS if doc not in encontrados]
+    return encontrados, nao_encontrados
+
+def gerar_relatorio(encontrados, nao_encontrados, nome_arquivo="relatorio.docx"):
+    """Gera um relatório em DOCX com os resultados"""
+    doc = Document()
+    
+    # Cabeçalho
+    doc.add_heading('RELATÓRIO DE ANÁLISE DOCUMENTAL', level=1)
+    doc.add_paragraph(f"Data da análise: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    
+    # Documentos encontrados
+    doc.add_heading('DOCUMENTOS ENCONTRADOS', level=2)
+    if encontrados:
+        for doc_name, info in encontrados.items():
+            doc.add_paragraph(f"✓ {doc_name} (Art. {info['artigo']})", style='List Bullet')
+    else:
+        doc.add_paragraph("Nenhum documento encontrado", style='List Bullet')
+    
+    # Documentos faltantes
+    doc.add_heading('DOCUMENTOS FALTANTES', level=2)
+    for doc_name in nao_encontrados:
+        artigo = next(artigo for doc, artigo in REQUISITOS if doc == doc_name)
+        doc.add_paragraph(f"✗ {doc_name} (Art. {artigo})", style='List Bullet')
+    
+    # Rodapé
+    doc.add_page_break()
+    doc.add_paragraph("_________________________________________")
+    doc.add_paragraph("Responsável Técnico:")
+    doc.add_paragraph("BM/RS - Seção de Afastamentos e Acidentes")
+    
+    # Salvar em buffer
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
 # ========== INTERFACE PRINCIPAL ========== #
 def main():
-    # Configuração inicial da sessão
-    if 'resultados' not in st.session_state:
-        st.session_state.resultados = None
-    
-    # Header
     st.title("🛡️ Sistema de Análise Documental - BM/RS")
     st.markdown("### Seção de Afastamentos e Acidentes")
     
     # Upload do arquivo
     uploaded_file = st.file_uploader(
         "Carregue o arquivo PDF para análise",
-        type=["pdf"]
+        type=["pdf"],
+        accept_multiple_files=False
     )
     
     # Opções de processamento
-    modo_rapido = st.checkbox("Modo rápido (análise parcial)", value=True)
+    modo_rapido = st.checkbox("Modo rápido (analisa apenas as primeiras 10 páginas)", value=True)
     
     # Botão de análise
     if uploaded_file and st.button("Iniciar Análise"):
         with st.spinner("Processando documento..."):
+            # Extrai texto do PDF
             texto = extrair_texto_pdf(uploaded_file, modo_rapido)
             
             if texto:
-                # Análise dos documentos encontrados
-                encontrados = {}
-                texto_min = texto.lower()
+                # Analisa os documentos
+                encontrados, nao_encontrados = analisar_documentos(texto)
                 
-                for doc, artigo in REQUISITOS:
-                    if doc.lower() in texto_min:
-                        encontrados[doc] = {"artigo": artigo}
-                
-                nao_encontrados = [doc for doc, _ in REQUISITOS if doc not in encontrados]
-                
+                # Armazena resultados na sessão
                 st.session_state.resultados = {
                     "encontrados": encontrados,
                     "nao_encontrados": nao_encontrados,
@@ -127,21 +185,44 @@ def main():
                 }
     
     # Exibição de resultados
-    if st.session_state.resultados:
-        st.success("Análise concluída!")
+    if 'resultados' in st.session_state:
+        st.success("Análise concluída com sucesso!")
         
-        col1, col2 = st.columns(2)
+        # Mostrar estatísticas
+        total_docs = len(REQUISITOS)
+        encontrados_count = len(st.session_state.resultados["encontrados"])
+        st.metric("Documentos Encontrados", f"{encontrados_count}/{total_docs}")
         
-        with col1:
-            st.subheader("✅ Documentos Encontrados")
-            for doc, info in st.session_state.resultados["encontrados"].items():
-                st.markdown(f"- **{doc}** (Art. {info['artigo']})")
+        # Abas para organização
+        tab1, tab2 = st.tabs(["Documentos Encontrados", "Documentos Faltantes"])
         
-        with col2:
-            st.subheader("❌ Documentos Faltantes")
-            for doc in st.session_state.resultados["nao_encontrados"]:
-                artigo = next(artigo for d, artigo in REQUISITOS if d == doc)
-                st.markdown(f"- {doc} (Art. {artigo})")
+        with tab1:
+            if st.session_state.resultados["encontrados"]:
+                for doc, info in st.session_state.resultados["encontrados"].items():
+                    st.success(f"**{doc}** (Art. {info['artigo']})")
+            else:
+                st.warning("Nenhum documento encontrado")
+        
+        with tab2:
+            if st.session_state.resultados["nao_encontrados"]:
+                for doc in st.session_state.resultados["nao_encontrados"]:
+                    artigo = next(artigo for d, artigo in REQUISITOS if d == doc)
+                    st.error(f"**{doc}** (Art. {artigo})")
+            else:
+                st.success("Todos os documentos foram encontrados!")
+        
+        # Botão para download do relatório
+        relatorio = gerar_relatorio(
+            st.session_state.resultados["encontrados"],
+            st.session_state.resultados["nao_encontrados"]
+        )
+        
+        st.download_button(
+            label="📄 Baixar Relatório Completo",
+            data=relatorio,
+            file_name="relatorio_analise.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
 if __name__ == "__main__":
     main()
