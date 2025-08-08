@@ -7,8 +7,6 @@ from pdf2image import convert_from_bytes
 from docx import Document
 import io
 from datetime import datetime
-import base64
-import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
@@ -20,35 +18,107 @@ st.set_page_config(
     layout="wide"
 )
 
-# Configuração do Tesseract (ajuste conforme necessário)
+# Configuração do Tesseract
 try:
     pytesseract.pytesseract.tesseract_cmd = os.getenv('TESSERACT_CMD', '/usr/bin/tesseract')
-    TESSERACT_CONFIG = "--oem 3 --psm 6 -l por"
+    TESSERACT_CONFIG = "--oem 3 --psm 6 -l por+eng"
 except Exception as e:
     st.error(f"Erro na configuração do Tesseract: {str(e)}")
     st.stop()
 
-# ========== LISTA DE REQUISITOS ========== #
-REQUISITOS = [
-    ("PORTARIA DA SINDICÂNCIA ESPECIAL", "NI 1.26 Art. 5º"),
-    ("PARTE DE ACIDENTE", "Decreto 32.280 Art. 12"),
-    ("ATESTADO DE ORIGEM", "NI 1.26 Anexo III"),
-    ("PRIMEIRO BOLETIM MÉDICO", "RDBM Cap. VII"),
-    ("ESCALA DE SERVIÇO", "Portaria 095/SSP/15"),
-    ("ATA DE HABILITAÇÃO PARA CONDUZIR VIATURA", "NI 1.26 §2º Art. 8"),
-    ("DOCUMENTAÇÃO OPERACIONAL", "RDBM Art. 45"),
-    ("INQUÉRITO TÉCNICO", "Decreto 32.280 Art. 15"),
-    ("CNH VÁLIDA", "NI 1.26 Art. 10"),
-    ("FORMULÁRIO PREVISTO NA PORTARIA 095/SSP/15", ""),
-    ("OUVITURA DO ACIDENTADO", "RDBM Art. 78"),
-    ("OUVITURA DAS TESTEMUNHAS", "Decreto 32.280 Art. 18"),
-    ("PARECER DO ENCARREGADO", "NI 1.26 Art. 12"),
-    ("CONCLUSÃO DA AUTORIDADE NOMEANTE", "RDBM Art. 123"),
-    ("RHE", "NI 1.26 Anexo II"),
-    ("LTS", "Portaria 095/SSP/15")
+# ========== MODELOS DE DOCUMENTOS COM PADRÕES ESPECÍFICOS ========== #
+DOCUMENTOS_PADRAO = [
+    {
+        "nome": "PORTARIA DA SINDICÂNCIA ESPECIAL",
+        "artigo": "NI 1.26 Art. 5º",
+        "padroes_texto": [
+            r"PORTARIA\s+N[º°]\s*\d+/SINDASV/\d{4}",
+            r"INSTAURAÇÃO\s+DE\s+SINDICÂNCIA\s+ESPECIAL",
+            r"PORTARIA\s+DE\s+SINDICÂNCIA\s+ESPECIAL"
+        ],
+        "palavras_chave": ["portaria", "sindicância", "especial", "instauração"],
+        "pagina_referencia": 3
+    },
+    {
+        "nome": "PARTE DE ACIDENTE",
+        "artigo": "Decreto 32.280 Art. 12",
+        "padroes_texto": [
+            r"PARTE\s+N[º°]\s*\d+/[A-Z]+/[A-Z]+\d{4}",
+            r"RELATÓRIO\s+DE\s+OCORRÊNCIA\s+DE\s+ACIDENTE",
+            r"PARTE\s+DE\s+ACIDENTE"
+        ],
+        "palavras_chave": ["parte", "acidente", "relatório", "ocorrência"],
+        "pagina_referencia": 1
+    },
+    {
+        "nome": "PRIMEIRO BOLETIM MÉDICO",
+        "artigo": "RDBM Cap. VII",
+        "padroes_texto": [
+            r"BOLETIM\s+DE\s+ATENDIMENTO",
+            r"PRONTUÁRIO\s+MÉDICO",
+            r"DIAGNÓSTICO\s+MÉDICO"
+        ],
+        "palavras_chave": ["boletim médico", "atendimento médico", "diagnóstico"],
+        "pagina_referencia": 9
+    },
+    {
+        "nome": "ESCALA DE SERVIÇO",
+        "artigo": "Portaria 095/SSP/15",
+        "padroes_texto": [
+            r"ESCALA\s+DE\s+SERVIÇO",
+            r"AUTORIZAÇÃO\s+DE\s+TROCA",
+            r"ESCALA\s+DO\s+DIA"
+        ],
+        "palavras_chave": ["escala", "serviço", "turno"],
+        "pagina_referencia": 27
+    },
+    {
+        "nome": "OUVITURA DO ACIDENTADO",
+        "artigo": "RDBM Art. 78",
+        "padroes_texto": [
+            r"TERMO\s+DE\s+OITIVA\s+DO\s+ACIDENTADO",
+            r"DECLARAÇÃO\s+DO\s+ACIDENTADO",
+            r"OUVITURA\s+DO\s+MILITAR"
+        ],
+        "palavras_chave": ["oitiva", "declaração", "acidentado"],
+        "pagina_referencia": 30
+    },
+    {
+        "nome": "PARECER DO ENCARREGADO",
+        "artigo": "NI 1.26 Art. 12",
+        "padroes_texto": [
+            r"PARECER\s+DO\s+ENCARREGADO",
+            r"CONCLUSÃO\s+DA\s+SINDICÂNCIA",
+            r"PARECER\s+FINAL"
+        ],
+        "palavras_chave": ["parecer", "encarregado", "conclusão"],
+        "pagina_referencia": 42
+    },
+    {
+        "nome": "ATESTADO DE ORIGEM",
+        "artigo": "NI 1.26 Anexo III",
+        "padroes_texto": [
+            r"ATESTADO\s+DE\s+ORIGEM",
+            r"PROVA\s+TESTEMUNHAL",
+            r"PROVA\s+TÉCNICA"
+        ],
+        "palavras_chave": ["atestado", "origem", "prova"],
+        "pagina_referencia": 17
+    },
+    {
+        "nome": "FORMULÁRIO PREVISTO NA PORTARIA 095/SSP/15",
+        "artigo": "",
+        "padroes_texto": [
+            r"FORMULÁRIO\s+DE\s+ACIDENTE",
+            r"ENCAMINHAMENTO\s+DE\s+ACIDENTE",
+            r"RELATÓRIO\s+DE\s+ACIDENTE"
+        ],
+        "palavras_chave": ["formulário", "acidente", "encaminhamento"],
+        "pagina_referencia": 6
+    }
 ]
 
-# ========== FUNÇÕES AUXILIARES ========== #
+# ========== FUNÇÕES DE PROCESSAMENTO ========== #
 def pagina_vazia(img, threshold=0.95):
     """Verifica se a página é predominantemente vazia"""
     try:
@@ -63,7 +133,6 @@ def pagina_vazia(img, threshold=0.95):
 def processar_imagem_ocr(img):
     """Processa imagem para OCR com tratamento de erro"""
     try:
-        # Pré-processamento básico da imagem
         img = img.convert('L')  # Converte para escala de cinza
         return pytesseract.image_to_string(img, config=TESSERACT_CONFIG)
     except Exception as e:
@@ -71,12 +140,11 @@ def processar_imagem_ocr(img):
         return ""
 
 def extrair_texto_pdf(uploaded_file, modo_rapido=False):
-    """Extrai texto do PDF com processamento paralelo"""
+    """Extrai texto do PDF com registro das páginas"""
     try:
         dpi = 200 if modo_rapido else 300
         max_pages = 10 if modo_rapido else None
         
-        # Converter PDF para imagens
         imagens = convert_from_bytes(
             uploaded_file.read(),
             dpi=dpi,
@@ -85,65 +153,83 @@ def extrair_texto_pdf(uploaded_file, modo_rapido=False):
             thread_count=4
         )
         
-        # Processamento paralelo das páginas
-        textos = []
+        textos_paginas = []
         with st.spinner(f"Processando {len(imagens)} páginas..."):
             with ThreadPoolExecutor() as executor:
                 futures = []
-                for img in imagens:
+                for i, img in enumerate(imagens):
                     if not pagina_vazia(img):
-                        futures.append(executor.submit(processar_imagem_ocr, img))
+                        futures.append((i+1, executor.submit(processar_imagem_ocr, img)))
                     else:
-                        futures.append(executor.submit(lambda: ""))
+                        futures.append((i+1, executor.submit(lambda: "")))
                 
-                for i, future in enumerate(futures):
-                    textos.append(future.result())
-                    st.progress((i + 1) / len(imagens))
+                for page_num, future in futures:
+                    texto = future.result()
+                    textos_paginas.append((page_num, texto.upper()))  # Padroniza para maiúsculas
+                    st.progress((page_num) / len(imagens))
         
-        return "\n\n".join(textos)
+        return textos_paginas
     except Exception as e:
         st.error(f"Erro ao processar PDF: {str(e)}")
         return None
 
-def analisar_documentos(texto):
-    """Analisa o texto extraído e identifica documentos"""
-    texto = texto.upper()  # Padroniza para maiúsculas
+def identificar_documentos(textos_paginas):
+    """Identifica documentos com registro das páginas onde foram encontrados"""
+    resultados = {}
     
-    encontrados = {}
-    for doc, artigo in REQUISITOS:
-        # Verifica se o nome do documento está no texto
-        if doc in texto:
-            encontrados[doc] = {"artigo": artigo}
+    for doc in DOCUMENTOS_PADRAO:
+        ocorrencias = []
+        for page_num, text in textos_paginas:
+            # Verifica pelos padrões de texto
+            for padrao in doc["padroes_texto"]:
+                if re.search(padrao, text, re.IGNORECASE):
+                    ocorrencias.append(page_num)
+                    break
+            # Verifica por palavras-chave se não encontrou por padrão
+            elif any(palavra in text.lower() for palavra in doc["palavras_chave"]):
+                ocorrencias.append(page_num)
+        
+        if ocorrencias:
+            resultados[doc["nome"]] = {
+                "artigo": doc["artigo"],
+                "paginas": ocorrencias,
+                "pagina_referencia": doc["pagina_referencia"]
+            }
     
-    nao_encontrados = [doc for doc, _ in REQUISITOS if doc not in encontrados]
-    return encontrados, nao_encontrados
+    return resultados
 
-def gerar_relatorio(encontrados, nao_encontrados, nome_arquivo="relatorio.docx"):
-    """Gera um relatório em DOCX com os resultados"""
+def gerar_relatorio(documentos_identificados, filename="relatorio_analise.docx"):
+    """Gera relatório detalhado com referências de páginas"""
     doc = Document()
     
     # Cabeçalho
     doc.add_heading('RELATÓRIO DE ANÁLISE DOCUMENTAL', level=1)
     doc.add_paragraph(f"Data da análise: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
     
-    # Documentos encontrados
-    doc.add_heading('DOCUMENTOS ENCONTRADOS', level=2)
-    if encontrados:
-        for doc_name, info in encontrados.items():
-            doc.add_paragraph(f"✓ {doc_name} (Art. {info['artigo']})", style='List Bullet')
+    # Documentos identificados
+    doc.add_heading('DOCUMENTOS IDENTIFICADOS', level=2)
+    if documentos_identificados:
+        for doc_name, info in documentos_identificados.items():
+            paginas = ", ".join(map(str, info["paginas"]))
+            doc.add_paragraph(
+                f"✓ {doc_name} (Art. {info['artigo']}) - Encontrado nas páginas: {paginas}",
+                style='List Bullet'
+            )
     else:
-        doc.add_paragraph("Nenhum documento encontrado", style='List Bullet')
+        doc.add_paragraph("Nenhum documento padrão identificado", style='List Bullet')
     
     # Documentos faltantes
     doc.add_heading('DOCUMENTOS FALTANTES', level=2)
-    for doc_name in nao_encontrados:
-        artigo = next(artigo for doc, artigo in REQUISITOS if doc == doc_name)
-        doc.add_paragraph(f"✗ {doc_name} (Art. {artigo})", style='List Bullet')
+    documentos_encontrados = [doc["nome"] for doc in DOCUMENTOS_PADRAO]
+    for doc in DOCUMENTOS_PADRAO:
+        if doc["nome"] not in documentos_identificados:
+            doc.add_paragraph(
+                f"✗ {doc['nome']} (Art. {doc['artigo']}) - Página de referência: {doc['pagina_referencia']}",
+                style='List Bullet'
+            )
     
     # Rodapé
     doc.add_page_break()
-    doc.add_paragraph("_________________________________________")
-    doc.add_paragraph("Responsável Técnico:")
     doc.add_paragraph("BM/RS - Seção de Afastamentos e Acidentes")
     
     # Salvar em buffer
@@ -155,7 +241,7 @@ def gerar_relatorio(encontrados, nao_encontrados, nome_arquivo="relatorio.docx")
 # ========== INTERFACE PRINCIPAL ========== #
 def main():
     st.title("🛡️ Sistema de Análise Documental - BM/RS")
-    st.markdown("### Seção de Afastamentos e Acidentes")
+    st.markdown("### Análise de Documentos com Referência de Páginas")
     
     # Upload do arquivo
     uploaded_file = st.file_uploader(
@@ -170,52 +256,36 @@ def main():
     # Botão de análise
     if uploaded_file and st.button("Iniciar Análise"):
         with st.spinner("Processando documento..."):
-            # Extrai texto do PDF
-            texto = extrair_texto_pdf(uploaded_file, modo_rapido)
+            # Extrai texto do PDF com numeração de páginas
+            textos_paginas = extrair_texto_pdf(uploaded_file, modo_rapido)
             
-            if texto:
-                # Analisa os documentos
-                encontrados, nao_encontrados = analisar_documentos(texto)
+            if textos_paginas:
+                # Identifica documentos com referência de páginas
+                documentos_identificados = identificar_documentos(textos_paginas)
                 
                 # Armazena resultados na sessão
                 st.session_state.resultados = {
-                    "encontrados": encontrados,
-                    "nao_encontrados": nao_encontrados,
-                    "texto": texto
+                    "documentos_identificados": documentos_identificados,
+                    "textos_paginas": textos_paginas
                 }
     
     # Exibição de resultados
     if 'resultados' in st.session_state:
         st.success("Análise concluída com sucesso!")
         
-        # Mostrar estatísticas
-        total_docs = len(REQUISITOS)
-        encontrados_count = len(st.session_state.resultados["encontrados"])
-        st.metric("Documentos Encontrados", f"{encontrados_count}/{total_docs}")
-        
-        # Abas para organização
-        tab1, tab2 = st.tabs(["Documentos Encontrados", "Documentos Faltantes"])
-        
-        with tab1:
-            if st.session_state.resultados["encontrados"]:
-                for doc, info in st.session_state.resultados["encontrados"].items():
-                    st.success(f"**{doc}** (Art. {info['artigo']})")
-            else:
-                st.warning("Nenhum documento encontrado")
-        
-        with tab2:
-            if st.session_state.resultados["nao_encontrados"]:
-                for doc in st.session_state.resultados["nao_encontrados"]:
-                    artigo = next(artigo for d, artigo in REQUISITOS if d == doc)
-                    st.error(f"**{doc}** (Art. {artigo})")
-            else:
-                st.success("Todos os documentos foram encontrados!")
+        # Mostrar documentos identificados
+        if st.session_state.resultados["documentos_identificados"]:
+            st.subheader("Documentos Identificados")
+            for doc_name, info in st.session_state.resultados["documentos_identificados"].items():
+                paginas = ", ".join(map(str, info["paginas"]))
+                st.success(f"**{doc_name}** (Art. {info['artigo']})")
+                st.write(f"Encontrado nas páginas: {paginas}")
+                st.write(f"Página de referência: {info['pagina_referencia']}")
+        else:
+            st.warning("Nenhum documento padrão foi identificado")
         
         # Botão para download do relatório
-        relatorio = gerar_relatorio(
-            st.session_state.resultados["encontrados"],
-            st.session_state.resultados["nao_encontrados"]
-        )
+        relatorio = gerar_relatorio(st.session_state.resultados["documentos_identificados"])
         
         st.download_button(
             label="📄 Baixar Relatório Completo",
