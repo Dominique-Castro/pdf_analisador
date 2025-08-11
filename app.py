@@ -1,3 +1,6 @@
+Parece que há um problema com a geração do relatório DOCX. Vou corrigir o código e fornecer uma versão funcional completa:
+
+```python
 import streamlit as st
 import os
 import numpy as np
@@ -8,7 +11,6 @@ from docx import Document
 import io
 from datetime import datetime
 import re
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
 
 # ========== CONFIGURAÇÃO INICIAL ========== #
@@ -149,19 +151,24 @@ def extrair_texto_pdf(uploaded_file, modo_rapido=False):
             uploaded_file.read(),
             dpi=dpi,
             first_page=1,
-            last_page=max_pages,
-            thread_count=4
+            last_page=max_pages
         )
         
         textos_paginas = []
-        with st.spinner(f"Processando {len(imagens)} páginas..."):
-            for i, img in enumerate(imagens):
-                if not pagina_vazia(img):
-                    texto = processar_imagem_ocr(img)
-                    textos_paginas.append((i+1, texto.upper()))  # Padroniza para maiúsculas
-                else:
-                    textos_paginas.append((i+1, ""))
-                st.progress((i + 1) / len(imagens))
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for i, img in enumerate(imagens):
+            status_text.text(f"Processando página {i+1}/{len(imagens)}...")
+            if not pagina_vazia(img):
+                texto = processar_imagem_ocr(img)
+                textos_paginas.append((i+1, texto.upper()))  # Padroniza para maiúsculas
+            else:
+                textos_paginas.append((i+1, ""))
+            progress_bar.progress((i + 1) / len(imagens))
+        
+        status_text.empty()
+        progress_bar.empty()
         
         return textos_paginas
     except Exception as e:
@@ -184,7 +191,7 @@ def identificar_documentos(textos_paginas):
                     break
             
             # Verifica por palavras-chave se não encontrou por padrão
-            if not encontrado and any(palavra in text.lower() for palavra in doc["palavras_chave"]):
+            if not encontrado and any(palavra.lower() in text.lower() for palavra in doc["palavras_chave"]):
                 ocorrencias.append(page_num)
         
         if ocorrencias:
@@ -196,44 +203,47 @@ def identificar_documentos(textos_paginas):
     
     return resultados
 
-def gerar_relatorio(documentos_identificados, filename="relatorio_analise.docx"):
+def gerar_relatorio(documentos_identificados):
     """Gera relatório detalhado com referências de páginas"""
-    doc = Document()
-    
-    # Cabeçalho
-    doc.add_heading('RELATÓRIO DE ANÁLISE DOCUMENTAL', level=1)
-    doc.add_paragraph(f"Data da análise: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-    
-    # Documentos identificados
-    doc.add_heading('DOCUMENTOS IDENTIFICADOS', level=2)
-    if documentos_identificados:
-        for doc_name, info in documentos_identificados.items():
-            paginas = ", ".join(map(str, info["paginas"]))
-            doc.add_paragraph(
-                f"✓ {doc_name} (Art. {info['artigo']}) - Encontrado nas páginas: {paginas}",
-                style='List Bullet'
-            )
-    else:
-        doc.add_paragraph("Nenhum documento padrão identificado", style='List Bullet')
-    
-    # Documentos faltantes
-    doc.add_heading('DOCUMENTOS FALTANTES', level=2)
-    for doc in DOCUMENTOS_PADRAO:
-        if doc["nome"] not in documentos_identificados:
-            doc.add_paragraph(
-                f"✗ {doc['nome']} (Art. {doc['artigo']}) - Página de referência: {doc['pagina_referencia']}",
-                style='List Bullet'
-            )
-    
-    # Rodapé
-    doc.add_page_break()
-    doc.add_paragraph("BM/RS - Seção de Afastamentos e Acidentes")
-    
-    # Salvar em buffer
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
+    try:
+        doc = Document()
+        
+        # Cabeçalho
+        doc.add_heading('RELATÓRIO DE ANÁLISE DOCUMENTAL', level=1)
+        doc.add_paragraph(f"Data da análise: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        
+        # Documentos identificados
+        doc.add_heading('DOCUMENTOS IDENTIFICADOS', level=2)
+        if documentos_identificados:
+            for doc_name, info in documentos_identificados.items():
+                paginas = ", ".join(map(str, info["paginas"]))
+                doc.add_paragraph(
+                    f"✓ {doc_name} (Art. {info['artigo']}) - Encontrado nas páginas: {paginas}",
+                    style='List Bullet'
+                )
+        else:
+            doc.add_paragraph("Nenhum documento padrão identificado", style='List Bullet')
+        
+        # Documentos faltantes
+        doc.add_heading('DOCUMENTOS FALTANTES', level=2)
+        for doc_padrao in DOCUMENTOS_PADRAO:
+            if doc_padrao["nome"] not in documentos_identificados:
+                doc.add_paragraph(
+                    f"✗ {doc_padrao['nome']} (Art. {doc_padrao['artigo']}) - Página de referência: {doc_padrao['pagina_referencia']}",
+                    style='List Bullet'
+                )
+        
+        # Rodapé
+        doc.add_paragraph("\n\nBM/RS - Seção de Afastamentos e Acidentes")
+        
+        # Salvar em buffer
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return buffer
+    except Exception as e:
+        st.error(f"Erro ao gerar relatório: {str(e)}")
+        return None
 
 # ========== INTERFACE PRINCIPAL ========== #
 def main():
@@ -273,23 +283,4 @@ def main():
         # Mostrar documentos identificados
         if st.session_state.resultados["documentos_identificados"]:
             st.subheader("Documentos Identificados")
-            for doc_name, info in st.session_state.resultados["documentos_identificados"].items():
-                paginas = ", ".join(map(str, info["paginas"]))
-                st.success(f"**{doc_name}** (Art. {info['artigo']})")
-                st.write(f"Encontrado nas páginas: {paginas}")
-                st.write(f"Página de referência: {info['pagina_referencia']}")
-        else:
-            st.warning("Nenhum documento padrão foi identificado")
-        
-        # Botão para download do relatório
-        relatorio = gerar_relatorio(st.session_state.resultados["documentos_identificados"])
-        
-        st.download_button(
-            label="📄 Baixar Relatório Completo",
-            data=relatorio,
-            file_name="relatorio_analise.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-
-if __name__ == "__main__":
-    main()
+            for doc_name, info in st.session_state.resultados["
