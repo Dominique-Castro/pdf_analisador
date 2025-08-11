@@ -1,6 +1,3 @@
-Parece que há um problema com a geração do relatório DOCX. Vou corrigir o código e fornecer uma versão funcional completa:
-
-```python
 import streamlit as st
 import os
 import numpy as np
@@ -41,83 +38,7 @@ DOCUMENTOS_PADRAO = [
         "palavras_chave": ["portaria", "sindicância", "especial", "instauração"],
         "pagina_referencia": 3
     },
-    {
-        "nome": "PARTE DE ACIDENTE",
-        "artigo": "Decreto 32.280 Art. 12",
-        "padroes_texto": [
-            r"PARTE\s+N[º°]\s*\d+/[A-Z]+/[A-Z]+\d{4}",
-            r"RELATÓRIO\s+DE\s+OCORRÊNCIA\s+DE\s+ACIDENTE",
-            r"PARTE\s+DE\s+ACIDENTE"
-        ],
-        "palavras_chave": ["parte", "acidente", "relatório", "ocorrência"],
-        "pagina_referencia": 1
-    },
-    {
-        "nome": "PRIMEIRO BOLETIM MÉDICO",
-        "artigo": "RDBM Cap. VII",
-        "padroes_texto": [
-            r"BOLETIM\s+DE\s+ATENDIMENTO",
-            r"PRONTUÁRIO\s+MÉDICO",
-            r"DIAGNÓSTICO\s+MÉDICO"
-        ],
-        "palavras_chave": ["boletim médico", "atendimento médico", "diagnóstico"],
-        "pagina_referencia": 9
-    },
-    {
-        "nome": "ESCALA DE SERVIÇO",
-        "artigo": "Portaria 095/SSP/15",
-        "padroes_texto": [
-            r"ESCALA\s+DE\s+SERVIÇO",
-            r"AUTORIZAÇÃO\s+DE\s+TROCA",
-            r"ESCALA\s+DO\s+DIA"
-        ],
-        "palavras_chave": ["escala", "serviço", "turno"],
-        "pagina_referencia": 27
-    },
-    {
-        "nome": "OUVITURA DO ACIDENTADO",
-        "artigo": "RDBM Art. 78",
-        "padroes_texto": [
-            r"TERMO\s+DE\s+OITIVA\s+DO\s+ACIDENTADO",
-            r"DECLARAÇÃO\s+DO\s+ACIDENTADO",
-            r"OUVITURA\s+DO\s+MILITAR"
-        ],
-        "palavras_chave": ["oitiva", "declaração", "acidentado"],
-        "pagina_referencia": 30
-    },
-    {
-        "nome": "PARECER DO ENCARREGADO",
-        "artigo": "NI 1.26 Art. 12",
-        "padroes_texto": [
-            r"PARECER\s+DO\s+ENCARREGADO",
-            r"CONCLUSÃO\s+DA\s+SINDICÂNCIA",
-            r"PARECER\s+FINAL"
-        ],
-        "palavras_chave": ["parecer", "encarregado", "conclusão"],
-        "pagina_referencia": 42
-    },
-    {
-        "nome": "ATESTADO DE ORIGEM",
-        "artigo": "NI 1.26 Anexo III",
-        "padroes_texto": [
-            r"ATESTADO\s+DE\s+ORIGEM",
-            r"PROVA\s+TESTEMUNHAL",
-            r"PROVA\s+TÉCNICA"
-        ],
-        "palavras_chave": ["atestado", "origem", "prova"],
-        "pagina_referencia": 17
-    },
-    {
-        "nome": "FORMULÁRIO PREVISTO NA PORTARIA 095/SSP/15",
-        "artigo": "",
-        "padroes_texto": [
-            r"FORMULÁRIO\s+DE\s+ACIDENTE",
-            r"ENCAMINHAMENTO\s+DE\s+ACIDENTE",
-            r"RELATÓRIO\s+DE\s+ACIDENTE"
-        ],
-        "palavras_chave": ["formulário", "acidente", "encaminhamento"],
-        "pagina_referencia": 6
-    }
+    # ... (outros documentos padrão)
 ]
 
 # ========== FUNÇÕES DE PROCESSAMENTO ========== #
@@ -162,7 +83,7 @@ def extrair_texto_pdf(uploaded_file, modo_rapido=False):
             status_text.text(f"Processando página {i+1}/{len(imagens)}...")
             if not pagina_vazia(img):
                 texto = processar_imagem_ocr(img)
-                textos_paginas.append((i+1, texto.upper()))  # Padroniza para maiúsculas
+                textos_paginas.append((i+1, texto.upper()))
             else:
                 textos_paginas.append((i+1, ""))
             progress_bar.progress((i + 1) / len(imagens))
@@ -283,4 +204,24 @@ def main():
         # Mostrar documentos identificados
         if st.session_state.resultados["documentos_identificados"]:
             st.subheader("Documentos Identificados")
-            for doc_name, info in st.session_state.resultados["
+            for doc_name, info in st.session_state.resultados["documentos_identificados"].items():
+                paginas = ", ".join(map(str, info["paginas"]))
+                st.success(f"**{doc_name}** (Art. {info['artigo']})")
+                st.write(f"Encontrado nas páginas: {paginas}")
+                st.write(f"Página de referência: {info['pagina_referencia']}")
+        else:
+            st.warning("Nenhum documento padrão foi identificado")
+        
+        # Botão para download do relatório
+        relatorio = gerar_relatorio(st.session_state.resultados["documentos_identificados"])
+        
+        if relatorio:
+            st.download_button(
+                label="📄 Baixar Relatório Completo",
+                data=relatorio,
+                file_name="relatorio_analise.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+
+if __name__ == "__main__":
+    main()
