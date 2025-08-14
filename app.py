@@ -9,6 +9,7 @@ import io
 from datetime import datetime
 import re
 import hashlib
+import subprocess
 
 # ========== CONFIGURAÇÃO INICIAL ========== #
 st.set_page_config(
@@ -16,6 +17,17 @@ st.set_page_config(
     page_icon="🛡️",
     layout="wide"
 )
+
+# Verificação do Poppler
+def verificar_poppler():
+    """Verifica se o Poppler está instalado e acessível"""
+    try:
+        subprocess.run(["pdfinfo", "-v"], capture_output=True, check=True)
+        return True
+    except Exception as e:
+        st.error(f"ERRO CRÍTICO: Poppler não está instalado corretamente. Detalhes: {str(e)}")
+        st.error("Solução: No Dockerfile, adicione 'RUN apt-get update && apt-get install -y poppler-utils'")
+        return False
 
 # Configuração do Tesseract
 try:
@@ -38,7 +50,7 @@ DOCUMENTOS_PADRAO = [
         "palavras_chave": ["portaria", "sindicância", "especial", "instauração"],
         "pagina_referencia": 3
     },
-    # ... (outros documentos padrão)
+    # ... (adicione outros documentos padrão conforme necessário)
 ]
 
 # ========== FUNÇÕES DE PROCESSAMENTO ========== #
@@ -65,14 +77,23 @@ def processar_imagem_ocr(img):
 def extrair_texto_pdf(uploaded_file, modo_rapido=False):
     """Extrai texto do PDF com registro das páginas"""
     try:
+        if not verificar_poppler():
+            return None
+
         dpi = 200 if modo_rapido else 300
         max_pages = 10 if modo_rapido else None
         
+        # Garante que o ponteiro do arquivo está no início
+        uploaded_file.seek(0)
+        file_bytes = uploaded_file.read()
+        
+        # Converte PDF para imagens
         imagens = convert_from_bytes(
-            uploaded_file.read(),
+            file_bytes,
             dpi=dpi,
             first_page=1,
-            last_page=max_pages
+            last_page=max_pages,
+            poppler_path="/usr/bin"  # Caminho explícito para o Poppler
         )
         
         textos_paginas = []
@@ -84,16 +105,14 @@ def extrair_texto_pdf(uploaded_file, modo_rapido=False):
             if not pagina_vazia(img):
                 texto = processar_imagem_ocr(img)
                 textos_paginas.append((i+1, texto.upper()))
-            else:
-                textos_paginas.append((i+1, ""))
             progress_bar.progress((i + 1) / len(imagens))
         
         status_text.empty()
         progress_bar.empty()
-        
         return textos_paginas
+
     except Exception as e:
-        st.error(f"Erro ao processar PDF: {str(e)}")
+        st.error(f"Falha ao processar PDF. Erro: {str(e)}")
         return None
 
 def identificar_documentos(textos_paginas):
@@ -170,6 +189,10 @@ def gerar_relatorio(documentos_identificados):
 def main():
     st.title("🛡️ Sistema de Análise Documental - BM/RS")
     st.markdown("### Análise de Documentos com Referência de Páginas")
+    
+    # Verificação inicial do ambiente
+    if not verificar_poppler():
+        st.stop()
     
     # Upload do arquivo
     uploaded_file = st.file_uploader(
