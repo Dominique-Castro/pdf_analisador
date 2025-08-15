@@ -26,7 +26,7 @@ def verificar_poppler():
         return True
     except Exception as e:
         st.error(f"ERRO CRÍTICO: Poppler não está instalado corretamente. Detalhes: {str(e)}")
-        st.error("Solução: No Dockerfile, adicione 'RUN apt-get update && apt-get install -y poppler-utils'")
+        st.error("Solução: Execute 'sudo apt-get install poppler-utils'")
         return False
 
 # Configuração do Tesseract
@@ -50,7 +50,7 @@ DOCUMENTOS_PADRAO = [
         "palavras_chave": ["portaria", "sindicância", "especial", "instauração"],
         "pagina_referencia": 3
     },
-    # ... (adicione outros documentos padrão conforme necessário)
+    # Adicione outros documentos conforme necessário
 ]
 
 # ========== FUNÇÕES DE PROCESSAMENTO ========== #
@@ -83,17 +83,15 @@ def extrair_texto_pdf(uploaded_file, modo_rapido=False):
         dpi = 200 if modo_rapido else 300
         max_pages = 10 if modo_rapido else None
         
-        # Garante que o ponteiro do arquivo está no início
         uploaded_file.seek(0)
         file_bytes = uploaded_file.read()
         
-        # Converte PDF para imagens
         imagens = convert_from_bytes(
             file_bytes,
             dpi=dpi,
             first_page=1,
             last_page=max_pages,
-            poppler_path="/usr/bin"  # Caminho explícito para o Poppler
+            poppler_path="/usr/bin"
         )
         
         textos_paginas = []
@@ -112,7 +110,7 @@ def extrair_texto_pdf(uploaded_file, modo_rapido=False):
         return textos_paginas
 
     except Exception as e:
-        st.error(f"Falha ao processar PDF. Erro: {str(e)}")
+        st.error(f"Falha ao processar PDF: {str(e)}")
         return None
 
 def identificar_documentos(textos_paginas):
@@ -122,7 +120,6 @@ def identificar_documentos(textos_paginas):
     for doc in DOCUMENTOS_PADRAO:
         ocorrencias = []
         for page_num, text in textos_paginas:
-            # Verifica pelos padrões de texto
             encontrado = False
             for padrao in doc["padroes_texto"]:
                 if re.search(padrao, text, re.IGNORECASE):
@@ -130,7 +127,6 @@ def identificar_documentos(textos_paginas):
                     encontrado = True
                     break
             
-            # Verifica por palavras-chave se não encontrou por padrão
             if not encontrado and any(palavra.lower() in text.lower() for palavra in doc["palavras_chave"]):
                 ocorrencias.append(page_num)
         
@@ -141,46 +137,81 @@ def identificar_documentos(textos_paginas):
                 "pagina_referencia": doc["pagina_referencia"]
             }
     
+    # DEBUG: Mostra dados identificados
+    st.subheader("Debug - Dados Identificados")
+    st.write(resultados)
+    
     return resultados
 
+def formatar_paginas(paginas):
+    """Formata números de páginas em intervalos (ex: [1,2,3,5] → '1-3, 5')"""
+    if not paginas:
+        return ""
+    
+    paginas = sorted(set(paginas))
+    ranges = []
+    start = paginas[0]
+    
+    for i in range(1, len(paginas)):
+        if paginas[i] != paginas[i-1] + 1:
+            if start == paginas[i-1]:
+                ranges.append(str(start))
+            else:
+                ranges.append(f"{start}-{paginas[i-1]}")
+            start = paginas[i]
+    
+    if start == paginas[-1]:
+        ranges.append(str(start))
+    else:
+        ranges.append(f"{start}-{paginas[-1]}")
+    
+    return ", ".join(ranges)
+
 def gerar_relatorio(documentos_identificados):
-    """Gera relatório detalhado com referências de páginas"""
+    """Gera relatório em DOCX com formatação aprimorada"""
     try:
         doc = Document()
         
         # Cabeçalho
-        doc.add_heading('RELATÓRIO DE ANÁLISE DOCUMENTAL', level=1)
-        doc.add_paragraph(f"Data da análise: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        title = doc.add_heading('RELATÓRIO DE ANÁLISE DOCUMENTAL', level=1)
+        title.alignment = 1  # Centralizado
         
+        # Data da análise
+        doc.add_paragraph(f"Data da análise: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        doc.add_paragraph()
+
         # Documentos identificados
         doc.add_heading('DOCUMENTOS IDENTIFICADOS', level=2)
         if documentos_identificados:
             for doc_name, info in documentos_identificados.items():
-                paginas = ", ".join(map(str, info["paginas"]))
-                doc.add_paragraph(
-                    f"✓ {doc_name} (Art. {info['artigo']}) - Encontrado nas páginas: {paginas}",
-                    style='List Bullet'
-                )
+                p = doc.add_paragraph(style='List Bullet')
+                p.add_run(f"✓ {doc_name}").bold = True
+                p.add_run(f" (Art. {info['artigo']})")
+                p.add_run(f" - Páginas: {formatar_paginas(info['paginas'])}").italic = True
+                p.add_run(f" | Pg. referência: {info['pagina_referencia']}")
         else:
             doc.add_paragraph("Nenhum documento padrão identificado", style='List Bullet')
-        
+
         # Documentos faltantes
         doc.add_heading('DOCUMENTOS FALTANTES', level=2)
         for doc_padrao in DOCUMENTOS_PADRAO:
             if doc_padrao["nome"] not in documentos_identificados:
-                doc.add_paragraph(
-                    f"✗ {doc_padrao['nome']} (Art. {doc_padrao['artigo']}) - Página de referência: {doc_padrao['pagina_referencia']}",
-                    style='List Bullet'
-                )
-        
+                p = doc.add_paragraph(style='List Bullet')
+                p.add_run(f"✗ {doc_padrao['nome']}").bold = True
+                p.add_run(f" (Art. {doc_padrao['artigo']})")
+                p.add_run(f" - Pg. referência: {doc_padrao['pagina_referencia']}").italic = True
+
         # Rodapé
-        doc.add_paragraph("\n\nBM/RS - Seção de Afastamentos e Acidentes")
-        
-        # Salvar em buffer
+        doc.add_page_break()
+        footer = doc.add_paragraph("BM/RS - Seção de Afastamentos e Acidentes")
+        footer.alignment = 1  # Centralizado
+
+        # Salva em buffer
         buffer = io.BytesIO()
         doc.save(buffer)
         buffer.seek(0)
         return buffer
+
     except Exception as e:
         st.error(f"Erro ao gerar relatório: {str(e)}")
         return None
@@ -211,10 +242,16 @@ def main():
             textos_paginas = extrair_texto_pdf(uploaded_file, modo_rapido)
             
             if textos_paginas:
-                # Identifica documentos com referência de páginas
+                # DEBUG: Mostra texto extraído (3 primeiras páginas)
+                st.subheader("Debug - Texto Extraído (Amostra)")
+                for pagina, texto in textos_paginas[:3]:
+                    st.write(f"Página {pagina} (primeiros 200 caracteres):")
+                    st.text(texto[:200] + "...")
+                
+                # Identifica documentos
                 documentos_identificados = identificar_documentos(textos_paginas)
                 
-                # Armazena resultados na sessão
+                # Armazena resultados
                 st.session_state.resultados = {
                     "documentos_identificados": documentos_identificados,
                     "textos_paginas": textos_paginas
@@ -228,10 +265,9 @@ def main():
         if st.session_state.resultados["documentos_identificados"]:
             st.subheader("Documentos Identificados")
             for doc_name, info in st.session_state.resultados["documentos_identificados"].items():
-                paginas = ", ".join(map(str, info["paginas"]))
                 st.success(f"**{doc_name}** (Art. {info['artigo']})")
-                st.write(f"Encontrado nas páginas: {paginas}")
-                st.write(f"Página de referência: {info['pagina_referencia']}")
+                st.write(f"🔍 Encontrado nas páginas: {formatar_paginas(info['paginas'])}")
+                st.write(f"📌 Página de referência: {info['pagina_referencia']}")
         else:
             st.warning("Nenhum documento padrão foi identificado")
         
@@ -240,9 +276,9 @@ def main():
         
         if relatorio:
             st.download_button(
-                label="📄 Baixar Relatório Completo",
+                label="📄 Baixar Relatório Completo (DOCX)",
                 data=relatorio,
-                file_name="relatorio_analise.docx",
+                file_name=f"relatorio_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
